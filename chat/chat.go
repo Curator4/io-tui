@@ -14,6 +14,8 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/curator4/io-tui/ai"
 )
 
 const gap = "\n\n\n"
@@ -87,6 +89,7 @@ type statusPanel struct {
 }
 
 type Model struct {
+	core		ai.Core
 	viewport    viewport.Model
 	textarea    textarea.Model
 	messages    []message
@@ -96,6 +99,10 @@ type Model struct {
 	infoPanel	infoPanel
 	statusPanel	statusPanel
 	err         error
+}
+
+type AIResponseMsg struct {
+	message message
 }
 
 func InitialModel() Model {
@@ -137,6 +144,7 @@ func InitialModel() Model {
 	}
 
 	return Model{
+		core:		 ai.NewCore(),
 		viewport:    vp,
 		textarea:    ta,
 		messages:    []message{},
@@ -194,22 +202,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				message: m.textarea.Value(),
 				role: "user",
 			}
-
-			// TODO: bot message (TEMP)
-			botMessage := message{
-				message: m.textarea.Value(),
-				role: "bot",
-			}
-
 			m.messages = append(m.messages, userMessage)
-			m.messages = append(m.messages, botMessage)
-			
+
 			// Update viewport content safely
 			if m.viewport.Height > 0 {
 				m.viewport.SetContent(m.formatMessages())
 				m.viewport.GotoBottom()
 			}
 			m.textarea.Reset()
+
+
+			return m, m.callAI(m.textarea.Value())
+
+		case AIResponseMsg:
+			m.messages = append(m.messages, msg.message)
+
 		default:
 			// All other keys go to textarea
 			m.textarea, tiCmd = m.textarea.Update(msg)
@@ -336,6 +343,17 @@ func (m Model) formatMessages() string {
 	return content.String()
 }
 
+func (m Model) callAI(message string) tea.Cmd {
+	return func() tea.Msg {
+		response, _ := m.core.api.GetResponse(message)
+		return  AIResponseMsg{
+			message: message {
+				role: "bot",
+				message: "response",
+			}
+		}
+	}
+}
 
 func (m Model) makeInfoPanel() string {
 	currentTime := time.Now().Format("15:04:05")

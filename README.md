@@ -17,6 +17,7 @@ I considered a few "platforms" for this project, discord bot, server hosted xter
         - [ ] permanent memory
 
 - [ ] extended functionality
+    - [ ] dynamic layout for whide terminal
     - [ ] notifications / independence
     - [ ] tools
         - [ ] utillity
