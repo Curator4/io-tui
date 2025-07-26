@@ -2,7 +2,7 @@
 
 I considered a few "platforms" for this project, discord bot, server hosted xterm bot. But in the interest of simplicity and project limitations I decided to do a tui.
 
-## planned features (ai usage in)
+## planned features (ai usage)
 - [ ] basic functionality
     - [x] tui setup (never touched it) (10%)
         - [x] chat history
