@@ -2,16 +2,16 @@
 
 I considered a few "platforms" for this project, discord bot, server hosted xterm bot. But in the interest of simplicity and project limitations I decided to do a tui.
 
-## planned features
+## planned features (ai usage in)
 - [ ] basic functionality
-    - [x] tui setup (never touched it)
+    - [x] tui setup (never touched it) (10%)
         - [x] chat history
         - [x] image
         - [x] chat window
-    - [ ] api calls
-        - [ ] standard calls
-        - [ ] calls with conversation context
-        - [ ] streaming responses (gemini)
+    - [x] api calls
+        - [x] standard calls
+        - [x] calls with conversation context (30%)
+        - [x] streaming responses (gemini) (75%)
     - [ ] memory
         - [ ] session memory
         - [ ] permanent memory
