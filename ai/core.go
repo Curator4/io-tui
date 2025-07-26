@@ -2,20 +2,22 @@ package ai
 
 import (
 	"os"
+	"fmt"
 	"github.com/curator4/io-tui/api"
+
 )
 
 type Core struct {
-	api api.AIAPI
+	API api.AIAPI
 }
 
-func NewCore() *Core {
+func NewCore() Core {
 	gemini, err := api.NewGeminiAPI()
 	if err != nil {
-		fmt(Printf("failed to start gemini"))
+		fmt.Printf("failed to start gemini")
 		os.Exit(1)
 	}
-	return core{
-		api: gemini,
+	return Core{
+		API: gemini,
 	}
 }

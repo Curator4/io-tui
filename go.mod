@@ -1,4 +1,4 @@
-module github.com/Curator4/io-tui
+module github.com/curator4/io-tui
 
 go 1.24.5
 

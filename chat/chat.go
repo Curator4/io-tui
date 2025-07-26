@@ -41,6 +41,9 @@ type (
 	errMsg error
 )
 
+type AIResponseMsg struct {
+	message message
+}
 
 type message struct {
 	message string
@@ -101,10 +104,6 @@ type Model struct {
 	err         error
 }
 
-type AIResponseMsg struct {
-	message message
-}
-
 func InitialModel() Model {
 
 
@@ -129,8 +128,8 @@ func InitialModel() Model {
 	ta.KeyMap.InsertNewline.SetEnabled(true)
 
 	infoPanel := infoPanel{
-		model: "gpt-4",
-		api: "openai",
+		model: "gemini-2.5-flash",
+		api: "google",
 		ai: "Io",
 		conversation: "conversation1",
 		apiStatus: online,
@@ -144,7 +143,7 @@ func InitialModel() Model {
 	}
 
 	return Model{
-		core:		 ai.NewCore(),
+		core:		ai.NewCore(),
 		viewport:    vp,
 		textarea:    ta,
 		messages:    []message{},
@@ -168,6 +167,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	)
 
 	switch msg := msg.(type) {
+	case AIResponseMsg:
+		m.messages = append(m.messages, msg.message)
+		m.statusPanel.status = AtEase
+		if m.viewport.Height > 0 {
+			m.viewport.SetContent(m.formatMessages())
+			m.viewport.GotoBottom()
+		}
+		return m, nil
+		
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
@@ -194,15 +202,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyUp, tea.KeyDown:
 			// Arrow keys only go to textarea for navigation
 			m.textarea, tiCmd = m.textarea.Update(msg)
+
 		case tea.KeyCtrlC, tea.KeyEsc:
 			fmt.Println(m.textarea.Value())
 			return m, tea.Quit
+
 		case tea.KeyEnter:
+			userInput := m.textarea.Value()
 			userMessage := message{
-				message: m.textarea.Value(),
+				message: userInput,
 				role: "user",
 			}
 			m.messages = append(m.messages, userMessage)
+			m.statusPanel.status = Processing
 
 			// Update viewport content safely
 			if m.viewport.Height > 0 {
@@ -211,11 +223,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.textarea.Reset()
 
-
-			return m, m.callAI(m.textarea.Value())
-
-		case AIResponseMsg:
-			m.messages = append(m.messages, msg.message)
+			return m, m.callAI(userInput)
 
 		default:
 			// All other keys go to textarea
@@ -343,14 +351,22 @@ func (m Model) formatMessages() string {
 	return content.String()
 }
 
-func (m Model) callAI(message string) tea.Cmd {
+func (m Model) callAI(userInput string) tea.Cmd {
 	return func() tea.Msg {
-		response, _ := m.core.api.GetResponse(message)
-		return  AIResponseMsg{
-			message: message {
-				role: "bot",
-				message: "response",
+		response, err := m.core.API.GetResponse(userInput)
+		if err != nil {
+			return AIResponseMsg{
+				message: message{
+					role:    "bot",
+					message: fmt.Sprintf("Error: %v", err),
+				},
 			}
+		}
+		return AIResponseMsg{
+			message: message{
+				role:    "bot",
+				message: response,
+			},
 		}
 	}
 }
@@ -443,7 +459,7 @@ func verticalSeparator(height int) string {
 }
 
 func loadAscii() string {
-	artBytes, err := os.ReadFile("/home/curator/workspace/projects/io-tui/avatar_art.txt")
+	artBytes, err := os.ReadFile("avatar_art.txt")
 	if err != nil {
 		return "🤖"
 	}

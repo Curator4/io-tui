@@ -1,5 +1,5 @@
 package api
 
 type AIAPI interface {
-	GetResponse(context string) (string, error)
+	GetResponse(prompt string) (string, error)
 }

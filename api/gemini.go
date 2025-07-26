@@ -21,12 +21,12 @@ func NewGeminiAPI() (*GeminiAPI, error) {
     }, nil
 }
 
-func (g *GeminiAPI) GetResponse(context string) (string, error) {
+func (g *GeminiAPI) GetResponse(prompt string) (string, error) {
     ctx := context.Background()
     result, err := g.client.Models.GenerateContent(
         ctx,
         "gemini-2.5-flash",
-        genai.Text(context),
+        genai.Text(prompt),
         nil,
     )
     if err != nil {
