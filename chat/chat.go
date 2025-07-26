@@ -20,6 +20,8 @@ const gap = "\n\n\n"
 
 // Color theme from ASCII art
 const (
+
+	// ui color
 	borderColor    = "#1e40af"  // Darker blue for border
 	separatorColor = "#60a5fa"  // Lighter blue for separators
 	
@@ -27,6 +29,10 @@ const (
 	timeColor      = "#e5e7eb"  // Gray/white for time
 	labelColor     = "#22d3ee"  // Cyan for labels
 	valueColor     = "#950056"  // Deep burgundy for values
+
+	// chat colors
+	userColor = "#0061cd"
+	botColor = "#ce75b7"
 )
 
 type (
@@ -153,9 +159,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		vpCmd tea.Cmd
 	)
 
-	m.textarea, tiCmd = m.textarea.Update(msg)
-	m.viewport, vpCmd = m.viewport.Update(msg)
-
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -177,8 +180,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport.SetContent(m.formatMessages())
 			m.viewport.GotoBottom()
 		}
+		
 	case tea.KeyMsg:
 		switch msg.Type {
+		case tea.KeyUp, tea.KeyDown:
+			// Arrow keys only go to textarea for navigation
+			m.textarea, tiCmd = m.textarea.Update(msg)
 		case tea.KeyCtrlC, tea.KeyEsc:
 			fmt.Println(m.textarea.Value())
 			return m, tea.Quit
@@ -203,12 +210,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.viewport.GotoBottom()
 			}
 			m.textarea.Reset()
+		default:
+			// All other keys go to textarea
+			m.textarea, tiCmd = m.textarea.Update(msg)
 		}
-
+		
+	case tea.MouseMsg:
+		if msg.Type == tea.MouseWheelUp || msg.Type == tea.MouseWheelDown {
+			// Mouse wheel only goes to viewport
+			m.viewport, vpCmd = m.viewport.Update(msg)
+		}
+		
 	// We handle errors just like any other message
 	case errMsg:
 		m.err = msg
 		return m, nil
+		
+	default:
+		// Other messages can go to both
+		m.textarea, tiCmd = m.textarea.Update(msg)
+		m.viewport, vpCmd = m.viewport.Update(msg)
 	}
 
 	return m, tea.Batch(tiCmd, vpCmd)
@@ -267,16 +288,41 @@ func (m Model) View() string {
 
 func (m Model) formatMessages() string {
 	userStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("10")).
+		Foreground(lipgloss.Color(userColor)).
 		Align(lipgloss.Right).
 		Width(m.viewport.Width)
 	botStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("12")).
+		Foreground(lipgloss.Color(botColor)).
 		Align(lipgloss.Left).
 		Width(m.viewport.Width)
 
 	var content strings.Builder
-	for _, msg := range m.messages {
+	var lastRole string
+
+	for i, msg := range m.messages {
+		// Add separator when speaker changes (but not for first message)
+		if i > 0 && msg.role != lastRole {
+			// Use the color and alignment of whoever just finished speaking
+			var separatorColor string
+			var separatorStyle lipgloss.Style
+			if lastRole == "user" {
+				separatorColor = userColor
+				separatorStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color(separatorColor)).
+					Align(lipgloss.Right).
+					Width(m.viewport.Width)
+			} else {
+				separatorColor = botColor
+				separatorStyle = lipgloss.NewStyle().
+					Foreground(lipgloss.Color(separatorColor)).
+					Align(lipgloss.Left).
+					Width(m.viewport.Width)
+			}
+			
+			separator := separatorStyle.Render("───")
+			content.WriteString(separator + "\n")
+		}
+
 		var styledMessage string
 		switch msg.role {
 		case "user":
@@ -285,6 +331,7 @@ func (m Model) formatMessages() string {
 			styledMessage = botStyle.Render(msg.message)
 		}
 		content.WriteString(styledMessage + "\n")
+		lastRole = msg.role
 	}
 	return content.String()
 }

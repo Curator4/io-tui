@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	p := tea.NewProgram(chat.InitialModel(), tea.WithAltScreen())
+	p := tea.NewProgram(chat.InitialModel(), tea.WithAltScreen(), tea.WithMouseCellMotion())
 
 	if err := p.Start(); err != nil {
 		fmt.Printf("Error: %v", err)
