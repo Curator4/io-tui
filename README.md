@@ -4,10 +4,10 @@ I considered a few "platforms" for this project, discord bot, server hosted xter
 
 ## planned features
 - [ ] basic functionality
-    - [ ] tui setup (never touched it)
-        - [ ] chat history
-        - [ ] image
-        - [ ] chat window
+    - [x] tui setup (never touched it)
+        - [x] chat history
+        - [x] image
+        - [x] chat window
     - [ ] api calls
     - [ ] memory
         - [ ] session memory
