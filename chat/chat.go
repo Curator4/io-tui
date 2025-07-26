@@ -16,6 +16,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/curator4/io-tui/ai"
+	"github.com/curator4/io-tui/api"
 )
 
 const gap = "\n\n\n"
@@ -41,13 +42,27 @@ type (
 	errMsg error
 )
 
-type AIResponseMsg struct {
-	message message
+type Message struct {
+	Message string
+	Role string
 }
 
-type message struct {
-	message string
-	role string
+type AIResponseMsg struct {
+	message Message
+}
+
+type AIStreamStartMsg struct {
+	textChan <-chan string
+	errChan  <-chan error
+}
+
+type AIStreamChunkMsg struct {
+	chunk    string
+	textChan <-chan string
+	errChan  <-chan error
+}
+
+type AIStreamCompleteMsg struct {
 }
 
 // api state
@@ -95,7 +110,7 @@ type Model struct {
 	core		ai.Core
 	viewport    viewport.Model
 	textarea    textarea.Model
-	messages    []message
+	messages    []Message
 	ascii		string
 	width       int
 	height      int
@@ -146,7 +161,7 @@ func InitialModel() Model {
 		core:		ai.NewCore(),
 		viewport:    vp,
 		textarea:    ta,
-		messages:    []message{},
+		messages:    []Message{},
 		ascii:		 loadAscii(),
 		width:       80,
 		height:      24,
@@ -157,7 +172,7 @@ func InitialModel() Model {
 }
 
 func (m Model) Init() tea.Cmd {
-	return textarea.Blink
+	return tea.Batch(textarea.Blink, m.statusPanel.spinner.Tick)
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -174,6 +189,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport.SetContent(m.formatMessages())
 			m.viewport.GotoBottom()
 		}
+		return m, nil
+
+	case AIStreamStartMsg:
+		// Add empty bot message immediately
+		m.messages = append(m.messages, Message{Role: "bot", Message: ""})
+		m.statusPanel.status = Processing
+		if m.viewport.Height > 0 {
+			m.viewport.SetContent(m.formatMessages())
+			m.viewport.GotoBottom()
+		}
+		// Start reading first chunk
+		return m, m.readNextChunk(msg.textChan, msg.errChan)
+
+	case AIStreamChunkMsg:
+		// Append chunk to last bot message
+		if len(m.messages) > 0 && m.messages[len(m.messages)-1].Role == "bot" {
+			m.messages[len(m.messages)-1].Message += msg.chunk
+		}
+		// Update viewport and continue reading next chunk
+		if m.viewport.Height > 0 {
+			m.viewport.SetContent(m.formatMessages())
+			m.viewport.GotoBottom()
+		}
+		return m, m.readNextChunk(msg.textChan, msg.errChan)
+
+	case AIStreamCompleteMsg:
+		m.statusPanel.status = AtEase
 		return m, nil
 		
 	case tea.WindowSizeMsg:
@@ -209,9 +251,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case tea.KeyEnter:
 			userInput := m.textarea.Value()
-			userMessage := message{
-				message: userInput,
-				role: "user",
+			userMessage := Message{
+				Message: userInput,
+				Role: "user",
 			}
 			m.messages = append(m.messages, userMessage)
 			m.statusPanel.status = Processing
@@ -245,9 +287,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Other messages can go to both
 		m.textarea, tiCmd = m.textarea.Update(msg)
 		m.viewport, vpCmd = m.viewport.Update(msg)
+		
+		// Handle spinner updates
+		var spinnerCmd tea.Cmd
+		m.statusPanel.spinner, spinnerCmd = m.statusPanel.spinner.Update(msg)
+		
+		return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 	}
 
-	return m, tea.Batch(tiCmd, vpCmd)
+	// Handle spinner updates for all cases
+	var spinnerCmd tea.Cmd  
+	m.statusPanel.spinner, spinnerCmd = m.statusPanel.spinner.Update(msg)
+	
+	return m, tea.Batch(tiCmd, vpCmd, spinnerCmd)
 }
 
 func (m Model) View() string {
@@ -316,7 +368,7 @@ func (m Model) formatMessages() string {
 
 	for i, msg := range m.messages {
 		// Add separator when speaker changes (but not for first message)
-		if i > 0 && msg.role != lastRole {
+		if i > 0 && msg.Role != lastRole {
 			// Use the color and alignment of whoever just finished speaking
 			var separatorColor string
 			var separatorStyle lipgloss.Style
@@ -339,35 +391,96 @@ func (m Model) formatMessages() string {
 		}
 
 		var styledMessage string
-		switch msg.role {
+		switch msg.Role {
 		case "user":
-			styledMessage = userStyle.Render(msg.message)
+			styledMessage = userStyle.Render(msg.Message)
 		case "bot":
-			styledMessage = botStyle.Render(msg.message)
+			styledMessage = botStyle.Render(msg.Message)
 		}
 		content.WriteString(styledMessage + "\n")
-		lastRole = msg.role
+		lastRole = msg.Role
 	}
 	return content.String()
 }
 
-func (m Model) callAI(userInput string) tea.Cmd {
+func (m Model) getAIResponse() tea.Cmd {
 	return func() tea.Msg {
-		response, err := m.core.API.GetResponse(userInput)
+		// Convert chat messages to API format
+		apiMessages := make([]ai.APIMessage, len(m.messages))
+		for i, msg := range m.messages {
+			apiMessages[i] = ai.APIMessage{
+				Role:    msg.Role,
+				Content: msg.Message,
+			}
+		}
+		
+		response, err := m.core.API.GetResponse(apiMessages)
 		if err != nil {
 			return AIResponseMsg{
-				message: message{
-					role:    "bot",
-					message: fmt.Sprintf("Error: %v", err),
+				message: Message{
+					Role:    "bot",
+					Message: fmt.Sprintf("Error: %v", err),
 				},
 			}
 		}
 		return AIResponseMsg{
-			message: message{
-				role:    "bot",
-				message: response,
+			message: Message{
+				Role:    "bot",
+				Message: response,
 			},
 		}
+	}
+}
+
+func (m Model) getAIStreamingResponse(streamingAPI api.StreamingAPI) tea.Cmd {
+	return func() tea.Msg {
+		// Convert chat messages to API format
+		apiMessages := make([]ai.APIMessage, len(m.messages))
+		for i, msg := range m.messages {
+			apiMessages[i] = ai.APIMessage{
+				Role:    msg.Role,
+				Content: msg.Message,
+			}
+		}
+		
+		// Start streaming
+		textChan, errChan := streamingAPI.GetStreamingResponse(apiMessages)
+		
+		return AIStreamStartMsg{
+			textChan: textChan,
+			errChan:  errChan,
+		}
+	}
+}
+
+func (m Model) readNextChunk(textChan <-chan string, errChan <-chan error) tea.Cmd {
+	return func() tea.Msg {
+		select {
+		case chunk, ok := <-textChan:
+			if !ok {
+				return AIStreamCompleteMsg{}
+			}
+			return AIStreamChunkMsg{
+				chunk:    chunk,
+				textChan: textChan,
+				errChan:  errChan,
+			}
+		case err := <-errChan:
+			if err != nil {
+				return AIResponseMsg{
+					message: Message{Role: "bot", Message: fmt.Sprintf("Error: %v", err)},
+				}
+			}
+			return AIStreamCompleteMsg{}
+		}
+	}
+}
+
+func (m Model) callAI(userInput string) tea.Cmd {
+	if streamingAPI, ok := m.core.API.(api.StreamingAPI); ok {
+		return m.getAIStreamingResponse(streamingAPI)
+	} else {
+		return m.getAIResponse()
 	}
 }
 

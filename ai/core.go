@@ -7,6 +7,8 @@ import (
 
 )
 
+type APIMessage = api.Message
+
 type Core struct {
 	API api.AIAPI
 }
