@@ -9,8 +9,8 @@ import (
 )
 
 func main() {
-	model := chat.NewModel()
-	p := tea.NewProgram(model)
+	p := tea.NewProgram(chat.InitialModel(), tea.WithAltScreen())
+
 	if err := p.Start(); err != nil {
 		fmt.Printf("Error: %v", err)
 		os.Exit(1)
