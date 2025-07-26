@@ -9,6 +9,9 @@ I considered a few "platforms" for this project, discord bot, server hosted xter
         - [x] image
         - [x] chat window
     - [ ] api calls
+        - [ ] standard calls
+        - [ ] calls with conversation context
+        - [ ] streaming responses (gemini)
     - [ ] memory
         - [ ] session memory
         - [ ] permanent memory
