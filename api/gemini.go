@@ -4,6 +4,7 @@ import (
 	"fmt"
     "context"
     "google.golang.org/genai"
+    "github.com/curator4/io-tui/types"
 )
 
 type GeminiAPI struct {
@@ -22,7 +23,7 @@ func NewGeminiAPI() (*GeminiAPI, error) {
     }, nil
 }
 
-func (g *GeminiAPI) prepareChatSession(messages []Message) (*genai.Chat, string, error) {
+func (g *GeminiAPI) prepareChatSession(messages []types.Message) (*genai.Chat, string, error) {
     ctx := context.Background()
     
     if len(messages) == 0 {
@@ -38,7 +39,7 @@ func (g *GeminiAPI) prepareChatSession(messages []Message) (*genai.Chat, string,
         var role genai.Role
         if msg.Role == "user" {
             role = genai.RoleUser
-        } else if msg.Role == "bot" {
+        } else if msg.Role == "assistant" {
             role = genai.RoleModel
         }
         
@@ -62,7 +63,7 @@ func (g *GeminiAPI) prepareChatSession(messages []Message) (*genai.Chat, string,
     return chat, lastUserMessage, nil
 }
 
-func (g *GeminiAPI) GetResponse(messages []Message) (string, error) {
+func (g *GeminiAPI) GetResponse(messages []types.Message) (string, error) {
     chat, lastUserMessage, err := g.prepareChatSession(messages)
     if err != nil {
         return "No messages to process", nil
@@ -82,7 +83,7 @@ func (g *GeminiAPI) GetResponse(messages []Message) (string, error) {
     return "No response received", nil
 }
 
-func (g *GeminiAPI) GetStreamingResponse(messages []Message) (<-chan string, <-chan error) {
+func (g *GeminiAPI) GetStreamingResponse(messages []types.Message) (<-chan string, <-chan error) {
 	textChan := make(chan string)
 	errChan := make(chan error, 1)
 
@@ -99,8 +100,16 @@ func (g *GeminiAPI) GetStreamingResponse(messages []Message) (<-chan string, <-c
 	ctx := context.Background()
 	stream := chat.SendMessageStream(ctx, genai.Part{Text: lastUserMessage})
 
-		for chunk, _ := range stream {
-			if len(chunk.Candidates) > 0 && len(chunk.Candidates[0].Content.Parts) > 0 {
+		for chunk := range stream {
+			// Add safety checks to prevent segmentation faults
+			if chunk == nil {
+				continue
+			}
+			if len(chunk.Candidates) > 0 && 
+			   chunk.Candidates[0] != nil && 
+			   chunk.Candidates[0].Content != nil &&
+			   len(chunk.Candidates[0].Content.Parts) > 0 &&
+			   chunk.Candidates[0].Content.Parts[0].Text != "" {
 				textChan <- chunk.Candidates[0].Content.Parts[0].Text
 			}
 		}

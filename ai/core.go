@@ -4,10 +4,7 @@ import (
 	"os"
 	"fmt"
 	"github.com/curator4/io-tui/api"
-
 )
-
-type APIMessage = api.Message
 
 type Core struct {
 	API api.AIAPI

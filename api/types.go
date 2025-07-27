@@ -1,15 +1,12 @@
 package api
 
-type Message struct {
-	Role    string
-	Content string
-}
+import "github.com/curator4/io-tui/types"
 
 type AIAPI interface {
-	GetResponse(messages []Message) (string, error)
+	GetResponse(messages []types.Message) (string, error)
 }
 
 type StreamingAPI interface {
 	AIAPI
-	GetStreamingResponse(messages []Message) (<-chan string, <-chan error)
+	GetStreamingResponse(messages []types.Message) (<-chan string, <-chan error)
 }
