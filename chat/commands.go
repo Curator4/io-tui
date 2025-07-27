@@ -211,6 +211,11 @@ func (m Model) listModels(apiName string) (tea.Model, tea.Cmd) {
 
 // Set functions
 func (m Model) setAI(name string) (tea.Model, tea.Cmd) {
+	// Check if this AI is already active
+	if m.ai.Name == name {
+		return m.showError(fmt.Sprintf("AI '%s' is already active! 🎯", name))
+	}
+	
 	newAI, err := db.SetActiveAI(m.database, name)
 	if err != nil {
 		return m.showError("Error switching to AI '" + name + "': " + err.Error())
@@ -225,20 +230,19 @@ func (m Model) setAI(name string) (tea.Model, tea.Cmd) {
 	// Clear active conversation since we switched AIs
 	m.conversation = db.Conversation{}
 	
-	// Clear chat log first, then add success message
+	// Clear chat log completely
 	m.messages = []types.Message{}
-	successMsg := types.Message{
-		Role:    "system",
-		Content: fmt.Sprintf("Switched to AI: %s", newAI.Name),
-	}
-	m.messages = append(m.messages, successMsg)
 	m.viewport.SetContent(m.formatMessages())
 	m.viewport.GotoBottom()
 	
 	// Return to chat mode
 	m.viewMode = chatMode
 	
-	return m, nil
+	// Set processing status before getting AI introduction
+	m.statusPanel.status = Processing
+	
+	// Get AI introduction
+	return m, m.getAIIntroduction()
 }
 
 func (m Model) setAPI(apiName string) (tea.Model, tea.Cmd) {
@@ -534,4 +538,32 @@ func (m Model) showError(msg string) (tea.Model, tea.Cmd) {
 	m.viewport.GotoBottom()
 	
 	return m, nil
+}
+
+func (m Model) getAIIntroduction() tea.Cmd {
+	return func() tea.Msg {
+		// Create a simple introduction prompt
+		introMessages := []types.Message{
+			{
+				Role:    "user",
+				Content: "Please introduce yourself briefly in a friendly way. Keep it to 1-2 sentences.",
+			},
+		}
+		
+		response, err := m.aicore.API.GetResponse(introMessages, m.ai.SystemPrompt)
+		if err != nil {
+			return AIIntroductionMsg{
+				message: types.Message{
+					Role:    "assistant",
+					Content: fmt.Sprintf("Hello! I'm %s 👋", m.ai.Name),
+				},
+			}
+		}
+		return AIIntroductionMsg{
+			message: types.Message{
+				Role:    "assistant", 
+				Content: response,
+			},
+		}
+	}
 }

@@ -57,6 +57,10 @@ type AIResponseMsg struct {
 	message types.Message
 }
 
+type AIIntroductionMsg struct {
+	message types.Message
+}
+
 type AIStreamStartMsg struct {
 	textChan <-chan string
 	errChan  <-chan error
@@ -210,6 +214,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.messages = append(m.messages, errorMsg)
 		}
+		m.messages = append(m.messages, msg.message)
+		m.statusPanel.status = AtEase
+		if m.viewport.Height > 0 {
+			m.viewport.SetContent(m.formatMessages())
+			m.viewport.GotoBottom()
+		}
+		return m, nil
+
+	case AIIntroductionMsg:
+		// Add to display without saving to database
 		m.messages = append(m.messages, msg.message)
 		m.statusPanel.status = AtEase
 		if m.viewport.Height > 0 {

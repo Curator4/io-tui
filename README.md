@@ -22,6 +22,22 @@ I considered a few "platforms" for this project, discord bot, server hosted xter
     - [ ] add disclaimer about partial use of AI to readme
     - [ ] social post
 
+pref before turnin
+- [ ] create ai with colors
+    - [ ] make entire programs color usage depend on a array of colors (palette)
+    - [ ] extend database with palette_json for ai
+    - [ ] update existing ais with palette on init
+    - [ ] ai creation
+        - [ ] call imgur link
+        - [ ] use https://github.com/cascax/colorthief-go to extract palette
+        - [ ] use https://github.com/qeesung/image2ascii to create ascii
+        - [ ] store ascii in ascii/name_ascii.txt
+        - [ ] store palette in model, or create and then return AI object with palette
+    - [ ] set it up as tool
+    - [ ] tool should call the set ai command too, and print short introduction
+- [ ] change ascii to be stored in database, not filepath
+- [ ] emoji github.com/kyokomi/emoji
+
 - [ ] features
     - [x] database
         - [x] tables/relations
@@ -65,16 +81,16 @@ I considered a few "platforms" for this project, discord bot, server hosted xter
         - [ ] create ai
             - [ ] dynamically create ascii from filepath or imgur link, currently use terminal command, save in standard /ascii folder maybe
             - [ ] tool for ai to call to create ascii, with image link for ascii and prompt, defaults for api/model
-        - [ ] memory
-            - [ ] new table to store memories, foreign kei ai_id, CRUD
-            - [ ] # command to remember like claude
-            - [ ] compose prompt + memories on api requests
+    - [ ] memory
+        - [ ] new table to store memories, foreign kei ai_id, CRUD
+        - [ ] # command to remember like claude
+        - [ ] compose prompt + memories on api requests
     - [ ] notifications / independence - some logic could maybe ping the user after randomized time or something if the program is left open
     - [ ] tools
         - [ ] image gen
         - [ ] web search
         - [ ] read webpage
-    - [ ] API integration, i defaulted to claude cuz it was used in bootdev course and has free tier        
+    - [ ] API integration
         - [ ] OpenAI
         - [ ] XAI
         - [ ] Anthropic
