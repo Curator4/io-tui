@@ -23,7 +23,7 @@ func NewGeminiAPI() (*GeminiAPI, error) {
     }, nil
 }
 
-func (g *GeminiAPI) prepareChatSession(messages []types.Message) (*genai.Chat, string, error) {
+func (g *GeminiAPI) prepareChatSession(messages []types.Message, systemPrompt string) (*genai.Chat, string, error) {
     ctx := context.Background()
     
     if len(messages) == 0 {
@@ -54,8 +54,16 @@ func (g *GeminiAPI) prepareChatSession(messages []types.Message) (*genai.Chat, s
         }
     }
     
-    // Create chat with full conversation history
-    chat, err := g.client.Chats.Create(ctx, "gemini-2.5-flash", nil, history)
+    // Create config with system instruction if provided
+    var config *genai.GenerateContentConfig
+    if systemPrompt != "" {
+        config = &genai.GenerateContentConfig{
+            SystemInstruction: genai.NewContentFromText(systemPrompt, genai.RoleUser),
+        }
+    }
+    
+    // Create chat with full conversation history and system instruction
+    chat, err := g.client.Chats.Create(ctx, "gemini-2.5-flash", config, history)
     if err != nil {
         return nil, "", err
     }
@@ -63,8 +71,8 @@ func (g *GeminiAPI) prepareChatSession(messages []types.Message) (*genai.Chat, s
     return chat, lastUserMessage, nil
 }
 
-func (g *GeminiAPI) GetResponse(messages []types.Message) (string, error) {
-    chat, lastUserMessage, err := g.prepareChatSession(messages)
+func (g *GeminiAPI) GetResponse(messages []types.Message, systemPrompt string) (string, error) {
+    chat, lastUserMessage, err := g.prepareChatSession(messages, systemPrompt)
     if err != nil {
         return "No messages to process", nil
     }
@@ -83,7 +91,7 @@ func (g *GeminiAPI) GetResponse(messages []types.Message) (string, error) {
     return "No response received", nil
 }
 
-func (g *GeminiAPI) GetStreamingResponse(messages []types.Message) (<-chan string, <-chan error) {
+func (g *GeminiAPI) GetStreamingResponse(messages []types.Message, systemPrompt string) (<-chan string, <-chan error) {
 	textChan := make(chan string)
 	errChan := make(chan error, 1)
 
@@ -91,14 +99,14 @@ func (g *GeminiAPI) GetStreamingResponse(messages []types.Message) (<-chan strin
 		defer close(textChan)
 		defer close(errChan)
 
-		chat, lastUserMessage, err := g.prepareChatSession(messages)
+		chat, lastUserMessage, err := g.prepareChatSession(messages, systemPrompt)
 		if err != nil {
 			errChan <- err
 			return
 		}
 
-	ctx := context.Background()
-	stream := chat.SendMessageStream(ctx, genai.Part{Text: lastUserMessage})
+		ctx := context.Background()
+		stream := chat.SendMessageStream(ctx, genai.Part{Text: lastUserMessage})
 
 		for chunk := range stream {
 			// Add safety checks to prevent segmentation faults

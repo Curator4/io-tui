@@ -4,6 +4,7 @@ import (
 	"database/sql"
 )
 
+
 type AI struct {
 	ID int
 	Name string
@@ -92,12 +93,57 @@ func GetAIAsciiPath(db *sql.DB, aiID int) (string, error) {
 	return asciiPath, nil
 }
 
-func CreateIo(db *sql.DB) error {
+func CreateAI(db *sql.DB, name, prompt, api, model, asciiPath string, isActive bool) error {
 	_, err := db.Exec(`
 		INSERT INTO ais (name, system_prompt, api, model, ascii_art_path, is_active)
-		VALUES ('Io', 'You are a helpful AI assistant', 'gemini', 'gemini-2.0-flash', 'ascii/io_ascii.txt', true)
-	`)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`, name, prompt, api, model, asciiPath, isActive)
 	return err
+}
+
+func UpdateActiveAIAPI(db *sql.DB, apiName string, defaultModel string) (AI, error) {
+	// Update the active AI's API and set it to the default model
+	_, err := db.Exec(`
+		UPDATE ais 
+		SET api = ?, model = ?
+		WHERE is_active = true
+	`, apiName, defaultModel)
+	if err != nil {
+		return AI{}, err
+	}
+	
+	// Return the updated active AI
+	return GetActiveAI(db)
+}
+
+func UpdateActiveAIModel(db *sql.DB, model string) (AI, error) {
+	// Update the active AI's model
+	_, err := db.Exec(`
+		UPDATE ais 
+		SET model = ?
+		WHERE is_active = true
+	`, model)
+	if err != nil {
+		return AI{}, err
+	}
+	
+	// Return the updated active AI
+	return GetActiveAI(db)
+}
+
+func UpdateActiveAIPrompt(db *sql.DB, prompt string) (AI, error) {
+	// Update the active AI's system prompt
+	_, err := db.Exec(`
+		UPDATE ais 
+		SET system_prompt = ?
+		WHERE is_active = true
+	`, prompt)
+	if err != nil {
+		return AI{}, err
+	}
+	
+	// Return the updated active AI
+	return GetActiveAI(db)
 }
 
 // Helper function to scan AI from database row

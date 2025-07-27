@@ -47,20 +47,19 @@ I considered a few "platforms" for this project, discord bot, server hosted xter
             - [ ] list tokens used in this session/conversation, tokens used: int
             - [ ] ascii time
             - [ ] cava tool
-    - [ ] conversations
-        - [ ] /resume functionality, opens list of conversations in chatwindow, select one u want to set active
-        - [ ] /clear command to end conversation
+    - [x] conversations
+        - [x] /resume functionality, opens list of conversations in chatwindow, select one u want to set active
+        - [x] /clear command to end conversation
         - [ ] /compact command to prevent conversation infinity growth, maybe force it
         - [ ] remove older conversations, currently it should infinitely expand
     - [ ] ais
-        - [ ] switch between ais functionality
-        - [ ] /show ais command
-        - [ ] /show apis command
-        - [ ] /show models (list all models in all apis) i'm thinking maybe combine these 2 for now
-        - [ ] add 2-3 on default database initialization
-        - [ ] /set ai command?
-        - [ ] /set prompt, api/model maybe
-        - [ ] show prompt either command or hook or both
+        - [x] switch between ais functionality
+        - [x] /show ais command
+        - [x] /show apis command
+        - [x] /show models (list all models in all apis) i'm thinking maybe combine these 2 for now
+        - [x] add 2-3 on default database initialization
+        - [x] /set ai command?
+        - [x] /set prompt, api/model maybe
         - [ ] maybe a tool to select ai
             - [ ] maybe this should also call some request that sends introduction?
         - [ ] create ai

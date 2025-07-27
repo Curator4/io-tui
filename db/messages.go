@@ -24,8 +24,9 @@ func LoadMessages(db *sql.DB, conversation_id int) ([]Message, error) {
 	rows, err := db.Query(`
 		SELECT id, conversation_id, role, content, created
 		FROM messages
-		ORDER BY created DESC
-	`)
+		WHERE conversation_id = ?
+		ORDER BY created ASC
+	`, conversation_id)
 	if err != nil {
 		return nil, err
 	}

@@ -10,6 +10,7 @@ import (
 	"time"
 	"database/sql"
 
+	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -43,6 +44,12 @@ const (
 
 type (
 	errMsg error
+	viewMode int
+)
+
+const (
+	chatMode viewMode = iota
+	listMode
 )
 
 
@@ -117,10 +124,12 @@ type Model struct {
 
 	viewport    viewport.Model
 	textarea    textarea.Model
+	list        list.Model
 	ascii		string
 	width       int
 	height      int
 	statusPanel	statusPanel
+	viewMode    viewMode
 	err         error
 }
 
@@ -170,10 +179,12 @@ func InitialModel(database *sql.DB) Model {
 		aicore:		 ai.NewCore(),
 		viewport:    vp,
 		textarea:    ta,
+		list:        list.New([]list.Item{}, createListDelegate(), 0, 0),
 		ascii:		 asciiContent,
 		width:       80,
 		height:      24,
 		statusPanel: statusPanel,
+		viewMode:    chatMode,
 		err:         nil,
 	}
 }
@@ -191,7 +202,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case AIResponseMsg:
 		// Save to database and add to display cache
-		_ = db.SaveMessage(m.database, m.conversation.ID, "assistant", msg.message.Content)
+		if err := db.SaveMessage(m.database, m.conversation.ID, "assistant", msg.message.Content); err != nil {
+			// Add error message to chat if save fails
+			errorMsg := types.Message{
+				Role:    "system",
+				Content: fmt.Sprintf("⚠️ Failed to save assistant message: %v", err),
+			}
+			m.messages = append(m.messages, errorMsg)
+		}
 		m.messages = append(m.messages, msg.message)
 		m.statusPanel.status = AtEase
 		if m.viewport.Height > 0 {
@@ -224,6 +242,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.readNextChunk(msg.textChan, msg.errChan)
 
 	case AIStreamCompleteMsg:
+		// Save the complete streamed message to database
+		if len(m.messages) > 0 && m.messages[len(m.messages)-1].Role == "assistant" {
+			lastMessage := m.messages[len(m.messages)-1]
+			if err := db.SaveMessage(m.database, m.conversation.ID, "assistant", lastMessage.Content); err != nil {
+				// Add error message to chat if save fails
+				errorMsg := types.Message{
+					Role:    "system",
+					Content: fmt.Sprintf("⚠️ Failed to save streamed message: %v", err),
+				}
+				m.messages = append(m.messages, errorMsg)
+				if m.viewport.Height > 0 {
+					m.viewport.SetContent(m.formatMessages())
+					m.viewport.GotoBottom()
+				}
+			}
+		}
 		m.statusPanel.status = AtEase
 		return m, nil
 		
@@ -249,6 +283,78 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		
 	case tea.KeyMsg:
+		// Handle list mode separately
+		if m.viewMode == listMode {
+			switch msg.Type {
+			case tea.KeyEsc:
+				// If filtering, let list handle Esc to exit filter first
+				if m.list.FilterState() == list.Filtering {
+					var listCmd tea.Cmd
+					m.list, listCmd = m.list.Update(msg)
+					return m, listCmd
+				}
+				// Otherwise exit list mode back to chat
+				m.viewMode = chatMode
+				return m, nil
+			case tea.KeyRunes:
+				// Handle specific key presses
+				if len(msg.Runes) > 0 && msg.Runes[0] == 'q' {
+					// q should close list, not quit program
+					m.viewMode = chatMode
+					return m, nil
+				}
+				// Let other runes (j, k, etc.) pass through to list
+				var listCmd tea.Cmd
+				m.list, listCmd = m.list.Update(msg)
+				return m, listCmd
+			case tea.KeyEnter:
+				// If filtering, let list handle Enter to select filtered item
+				if m.list.FilterState() == list.Filtering {
+					var listCmd tea.Cmd
+					m.list, listCmd = m.list.Update(msg)
+					return m, listCmd
+				}
+				// Handle selection based on list title
+				if selectedItem := m.list.SelectedItem(); selectedItem != nil {
+					if aiItem, ok := selectedItem.(aiItem); ok {
+						if strings.Contains(m.list.Title, "Select AI") {
+							// This is a selector - switch AI
+							return m.setAI(aiItem.ai.Name)
+						}
+						// This is just a view list - do nothing on Enter
+						return m, nil
+					}
+					if apiItem, ok := selectedItem.(apiItem); ok {
+						if strings.Contains(m.list.Title, "Select API") {
+							// This is a selector - switch API
+							return m.setAPI(apiItem.name)
+						}
+						// This is a view list - navigate to models for this API
+						return m.listModels(apiItem.name)
+					}
+					if modelItem, ok := selectedItem.(modelItem); ok {
+						if strings.Contains(m.list.Title, "Select") && strings.Contains(m.list.Title, "Model") {
+							// This is a selector - switch model
+							return m.setModel(modelItem.name)
+						}
+						// This is just a view list - do nothing on Enter
+						return m, nil
+					}
+					if conversationItem, ok := selectedItem.(conversationItem); ok {
+						// Resume this conversation
+						return m.resumeConversation(conversationItem.conversation.ID)
+					}
+				}
+			default:
+				// Let list handle navigation
+				var listCmd tea.Cmd
+				m.list, listCmd = m.list.Update(msg)
+				return m, listCmd
+			}
+			return m, nil
+		}
+		
+		// Chat mode key handling
 		switch msg.Type {
 		case tea.KeyUp, tea.KeyDown:
 			// Arrow keys only go to textarea for navigation
@@ -266,6 +372,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
+			// Handle slash commands
+			if strings.HasPrefix(userInput, "/") {
+				return m.handleSlashCommand(userInput)
+			}
+
 			// create conversation if none is active
 			if m.conversation.ID == 0 {
 				conv, _ := db.CreateConversation(m.database, userInput, m.ai.ID)
@@ -277,7 +388,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				Role: "user",
 			}
 			// Save to database
-			_ = db.SaveMessage(m.database, m.conversation.ID, "user", userInput)
+			if err := db.SaveMessage(m.database, m.conversation.ID, "user", userInput); err != nil {
+				// Add error message to chat if save fails
+				errorMsg := types.Message{
+					Role:    "system",
+					Content: fmt.Sprintf("⚠️ Failed to save user message: %v", err),
+				}
+				m.messages = append(m.messages, errorMsg)
+			}
 			m.messages = append(m.messages, userMessage)
 			m.statusPanel.status = Processing
 
@@ -365,11 +483,26 @@ func (m Model) View() string {
 		rightPanel,
 	)
 	
+	// Conditional main content based on view mode
+	var mainContent string
+	if m.viewMode == listMode {
+		// Set list size to viewport dimensions  
+		m.list.SetSize(m.viewport.Width, m.viewport.Height)
+		// Force left alignment for list content
+		listStyle := lipgloss.NewStyle().
+			Align(lipgloss.Left).
+			Width(m.viewport.Width)
+		mainContent = listStyle.Render(m.list.View())
+	} else {
+		// Normal chat viewport
+		mainContent = m.viewport.View()
+	}
+	
 	content := lipgloss.JoinVertical(
 		lipgloss.Left,
 		topPanel,
 		horizontalSeparator(contentWidth),
-		m.viewport.View(),
+		mainContent,
 		horizontalSeparator(contentWidth),
 		m.textarea.View(),
 	)
@@ -390,8 +523,12 @@ func (m Model) formatMessages() string {
 	var lastRole string
 
 	for i, msg := range m.messages {
-		// Add separator when speaker changes (but not for first message)
-		if i > 0 && msg.Role != lastRole {
+		// Add separator when speaker changes (but not for system messages)
+		shouldAddSeparator := i > 0 && msg.Role != lastRole && 
+			(lastRole == "user" || lastRole == "assistant") && 
+			(msg.Role == "user" || msg.Role == "assistant")
+		
+		if shouldAddSeparator {
 			// Use the color and alignment of whoever just finished speaking
 			var separatorColor string
 			var separatorStyle lipgloss.Style
@@ -419,6 +556,12 @@ func (m Model) formatMessages() string {
 			styledMessage = userStyle.Render(msg.Content)
 		case "assistant":
 			styledMessage = botStyle.Render(msg.Content)
+		case "system":
+			systemStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#fbbf24")).
+				Align(lipgloss.Left).
+				Width(m.viewport.Width)
+			styledMessage = "\n" + systemStyle.Render(msg.Content) + "\n"
 		}
 		content.WriteString(styledMessage + "\n")
 		lastRole = msg.Role
@@ -428,10 +571,15 @@ func (m Model) formatMessages() string {
 
 func (m Model) getAIResponse() tea.Cmd {
 	return func() tea.Msg {
-		// Use messages directly (already in correct format)
-		apiMessages := m.messages
+		// Filter out system messages for API calls
+		var apiMessages []types.Message
+		for _, msg := range m.messages {
+			if msg.Role != "system" {
+				apiMessages = append(apiMessages, msg)
+			}
+		}
 		
-		response, err := m.aicore.API.GetResponse(apiMessages)
+		response, err := m.aicore.API.GetResponse(apiMessages, m.ai.SystemPrompt)
 		if err != nil {
 			return AIResponseMsg{
 				message: types.Message{
@@ -451,11 +599,16 @@ func (m Model) getAIResponse() tea.Cmd {
 
 func (m Model) getAIStreamingResponse(streamingAPI api.StreamingAPI) tea.Cmd {
 	return func() tea.Msg {
-		// Use messages directly (already in correct format)
-		apiMessages := m.messages
+		// Filter out system messages for API calls
+		var apiMessages []types.Message
+		for _, msg := range m.messages {
+			if msg.Role != "system" {
+				apiMessages = append(apiMessages, msg)
+			}
+		}
 		
 		// Start streaming
-		textChan, errChan := streamingAPI.GetStreamingResponse(apiMessages)
+		textChan, errChan := streamingAPI.GetStreamingResponse(apiMessages, m.ai.SystemPrompt)
 		
 		return AIStreamStartMsg{
 			textChan: textChan,
@@ -499,7 +652,7 @@ func (m Model) makeInfoPanel() string {
 	currentTime := time.Now().Format("15:04:05")
 
 	// Get conversation name or default
-	conversationName := "No conversation"
+	conversationName := "none"
 	if m.conversation.ID != 0 {
 		conversationName = m.conversation.Name
 	}
@@ -601,3 +754,126 @@ var labelStyle = lipgloss.NewStyle().
 
 var valueStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color(valueColor))
+
+func createListDelegate() list.DefaultDelegate {
+	delegate := list.NewDefaultDelegate()
+	
+	// Left-align and style the list items
+	delegate.Styles.SelectedTitle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#ffffff")).
+		Background(lipgloss.Color("#1e40af")).
+		Align(lipgloss.Left).
+		Padding(0, 1).
+		MarginLeft(0)
+	
+	delegate.Styles.SelectedDesc = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#e5e7eb")).
+		Background(lipgloss.Color("#1e40af")).
+		Align(lipgloss.Left).
+		Padding(0, 1).
+		MarginLeft(0)
+	
+	delegate.Styles.NormalTitle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#22d3ee")).
+		Align(lipgloss.Left).
+		Padding(0, 1).
+		MarginLeft(0)
+		
+	delegate.Styles.NormalDesc = lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#6b7280")).
+		Align(lipgloss.Left).
+		Padding(0, 1).
+		MarginLeft(0)
+	
+	return delegate
+}
+
+func (m Model) handleSlashCommand(command string) (tea.Model, tea.Cmd) {
+	m.textarea.Reset()
+	
+	parts := strings.Fields(command)
+	if len(parts) == 0 {
+		return m, nil
+	}
+	
+	cmd := strings.TrimPrefix(parts[0], "/")
+	
+	switch cmd {
+	case "list":
+		if len(parts) < 2 {
+			return m.showError("Usage: /list [ai(s)|conversations|api(s)|model(s)]")
+		}
+		
+		switch parts[1] {
+		case "ai", "ais":
+			return m.listAIs()
+		case "conversations":
+			return m.listConversations()
+		case "api", "apis":
+			return m.listAPIs()
+		case "model", "models":
+			if len(parts) < 3 {
+				return m.showError("Usage: /list model(s) [gemini]")
+			}
+			return m.listModels(parts[2])
+		default:
+			return m.showError("Unknown list type: " + parts[1])
+		}
+		
+	case "set":
+		if len(parts) < 2 {
+			return m.showError("Usage: /set [ai|api|model|prompt]")
+		}
+		switch parts[1] {
+		case "ai":
+			// Interactive selector only: /set ai
+			return m.openAISelector()
+		case "api":
+			// Interactive selector only: /set api
+			return m.openAPISelector()
+		case "model":
+			// Interactive selector only: /set model
+			return m.openModelSelector()
+		case "prompt":
+			if len(parts) < 3 {
+				return m.showError("Usage: /set prompt <your prompt text here>")
+			}
+			// Join all parts after "prompt" to get the full prompt text
+			promptText := strings.Join(parts[2:], " ")
+			return m.setPrompt(promptText)
+		default:
+			return m.showError("Unknown set type: " + parts[1])
+		}
+		
+	case "resume":
+		return m.listConversations()
+		
+	case "clear":
+		return m.clearConversation()
+		
+	case "show":
+		if len(parts) < 2 {
+			return m.showError("Usage: /show [prompt]")
+		}
+		switch parts[1] {
+		case "prompt":
+			return m.showPrompt()
+		default:
+			return m.showError("Unknown show type: " + parts[1])
+		}
+		
+	case "commands", "help":
+		return m.showCommands()
+		
+	case "rename":
+		if len(parts) < 2 {
+			return m.showError("Usage: /rename <new conversation name>")
+		}
+		// Join all parts after "rename" to get the full name
+		newName := strings.Join(parts[1:], " ")
+		return m.renameConversation(newName)
+		
+	default:
+		return m.showError("Unknown command: " + command)
+	}
+}

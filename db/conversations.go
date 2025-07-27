@@ -108,6 +108,38 @@ func ListConversations(db *sql.DB) ([]Conversation, error) {
 	return conversations, rows.Err()
 }
 
+func ListConversationsByAI(db *sql.DB, aiID int) ([]Conversation, error) {
+	rows, err := db.Query(`
+		SELECT id, ai_id, name, is_active, created
+		FROM conversations
+		WHERE ai_id = ?
+		ORDER BY created DESC
+	`, aiID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var conversations []Conversation
+	for rows.Next() {
+		conv, err := scanConversation(rows)
+		if err != nil {
+			return nil, err
+		}
+		conversations = append(conversations, conv)
+	}
+	return conversations, rows.Err()
+}
+
+func RenameConversation(db *sql.DB, conversationID int, newName string) error {
+	_, err := db.Exec(`
+		UPDATE conversations 
+		SET name = ?
+		WHERE id = ?
+	`, newName, conversationID)
+	return err
+}
+
 func DeleteConversation(db *sql.DB, id int) error {
 	// First delete all messages in this conversation
 	if err := DeleteMessagesByConversation(db, id); err != nil {
