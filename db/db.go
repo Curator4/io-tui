@@ -47,6 +47,7 @@ func createTables(db *sql.DB) error {
 		system_prompt TEXT,
 		api TEXT NOT NULL,
 		model TEXT NOT NULL,
+		ascii_art_path TEXT DEFAULT 'ascii/io_ascii.txt',
 		is_active BOOLEAN DEFAULT FALSE,
 		created DATETIME DEFAULT CURRENT_TIMESTAMP
 	);

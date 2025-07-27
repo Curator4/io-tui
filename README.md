@@ -23,14 +23,15 @@ I considered a few "platforms" for this project, discord bot, server hosted xter
     - [ ] social post
 
 - [ ] features
-    - [ ] database
+    - [x] database
         - [x] tables/relations
-            - [ ] forgot ascii file path column
+            - [x] forgot ascii file path column
         - [x] CRUD
-        - [ ] integration into chat logic
+        - [x] integration into chat logic
     - [ ] UI
         - [ ] dynamic layout for wide terminal (currently basically assumes u in a tall terminal)
         - [ ] different color palettes (perhaps dynamically generated based on input image/ascii
+        - [ ] newlines in textarea
         - [ ] chat
             - [ ] support emoji, both input & output, i'm thinking :thinking: for input
             - [ ] break up non streaming responses into blocks and send sentence by sentence or something like that, personalizes the "bot"

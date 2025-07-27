@@ -10,13 +10,14 @@ type AI struct {
 	SystemPrompt string
 	API string
 	Model string
+	AsciiArtPath string
 	IsActive bool
 	Created string
 }
 
 func GetAIByID(db *sql.DB, id int) (AI, error) {
 	row := db.QueryRow(`
-		SELECT id, name, system_prompt, api, model, is_active, created
+		SELECT id, name, system_prompt, api, model, ascii_art_path, is_active, created
 		FROM ais WHERE id = ?
 	`, id)
 	return scanAI(row)
@@ -24,7 +25,7 @@ func GetAIByID(db *sql.DB, id int) (AI, error) {
 
 func GetAIByName(db *sql.DB, name string) (AI, error) {
 	row := db.QueryRow(`
-		SELECT id, name, system_prompt, api, model, is_active, created
+		SELECT id, name, system_prompt, api, model, ascii_art_path, is_active, created
 		FROM ais WHERE name = ?
 	`, name)
 	return scanAI(row)
@@ -32,7 +33,7 @@ func GetAIByName(db *sql.DB, name string) (AI, error) {
 
 func ListAIs(db *sql.DB) ([]AI, error) {
 	rows, err := db.Query(`
-		SELECT id, name, system_prompt, api, model, is_active, created
+		SELECT id, name, system_prompt, api, model, ascii_art_path, is_active, created
 		FROM ais
 	`)
 	if err != nil {
@@ -53,7 +54,7 @@ func ListAIs(db *sql.DB) ([]AI, error) {
 
 func GetActiveAI(db *sql.DB) (AI, error) {
 	row := db.QueryRow(`
-		SELECT id, name, system_prompt, api, model, is_active, created
+		SELECT id, name, system_prompt, api, model, ascii_art_path, is_active, created
 		FROM ais WHERE is_active = true
 	`)
 	return scanAI(row)
@@ -76,10 +77,25 @@ func SetActiveAI(db *sql.DB, name string) (AI, error) {
 }
 
 
+func GetAIAsciiPath(db *sql.DB, aiID int) (string, error) {
+	var asciiPath string
+	row := db.QueryRow(`
+		SELECT ascii_art_path 
+		FROM ais WHERE id = ?
+	`, aiID)
+	
+	err := row.Scan(&asciiPath)
+	if err != nil {
+		return "", err
+	}
+	
+	return asciiPath, nil
+}
+
 func CreateIo(db *sql.DB) error {
 	_, err := db.Exec(`
-		INSERT INTO ais (name, system_prompt, api, model, is_active)
-		VALUES ('Io', 'You are a helpful AI assistant', 'gemini', 'gemini-2.0-flash', true)
+		INSERT INTO ais (name, system_prompt, api, model, ascii_art_path, is_active)
+		VALUES ('Io', 'You are a helpful AI assistant', 'gemini', 'gemini-2.0-flash', 'ascii/io_ascii.txt', true)
 	`)
 	return err
 }
@@ -87,6 +103,6 @@ func CreateIo(db *sql.DB) error {
 // Helper function to scan AI from database row
 func scanAI(scanner interface{ Scan(...interface{}) error }) (AI, error) {
 	var ai AI
-	err := scanner.Scan(&ai.ID, &ai.Name, &ai.SystemPrompt, &ai.API, &ai.Model, &ai.IsActive, &ai.Created)
+	err := scanner.Scan(&ai.ID, &ai.Name, &ai.SystemPrompt, &ai.API, &ai.Model, &ai.AsciiArtPath, &ai.IsActive, &ai.Created)
 	return ai, err
 }

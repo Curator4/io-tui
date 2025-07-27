@@ -18,6 +18,8 @@ import (
 
 	"github.com/curator4/io-tui/ai"
 	"github.com/curator4/io-tui/api"
+	"github.com/curator4/io-tui/db"
+	"github.com/curator4/io-tui/types"
 )
 
 const gap = "\n\n\n"
@@ -43,13 +45,9 @@ type (
 	errMsg error
 )
 
-type Message struct {
-	Message string
-	Role string
-}
 
 type AIResponseMsg struct {
-	message Message
+	message types.Message
 }
 
 type AIStreamStartMsg struct {
@@ -83,15 +81,6 @@ func (a apiState) String() string {
 	return ""
 }
 
-
-type infoPanel struct {
-	ai string
-	api string
-	model string
-	conversation string
-	apiStatus apiState 
-}
-
 // ai state
 type statusState int
 const (
@@ -104,24 +93,38 @@ const (
 type statusPanel struct {
 	spinner spinner.Model
 	status statusState
-	
 }
 
 type Model struct {
-	db			*sql.DB
-	core		ai.Core
+	// database reference
+	database *sql.DB
+
+	// a struct that has an API interface (handles requests).
+	// convoluted way to set it up, i know...
+	// but i was considering further stuff like api indepedent tools
+	// actually, thinking again, i dont think this was necisarry
+	// i used "core" cuz i dont like the term "manager"
+	aicore ai.Core
+
+	// to keep track of active session (ai config & conversation)
+	ai db.AI
+	conversation db.Conversation
+
+	// cache of displayMessages.
+	// To prevent having to query the database for chatlog on every update
+	// defined in types becuz i use it in api package too
+	messages	[]types.Message
+
 	viewport    viewport.Model
 	textarea    textarea.Model
-	messages    []Message
 	ascii		string
 	width       int
 	height      int
-	infoPanel	infoPanel
 	statusPanel	statusPanel
 	err         error
 }
 
-func InitialModel(db *sql.DB) Model {
+func InitialModel(database *sql.DB) Model {
 
 
 
@@ -144,31 +147,32 @@ func InitialModel(db *sql.DB) Model {
 
 	ta.KeyMap.InsertNewline.SetEnabled(true)
 
-	infoPanel := infoPanel{
-		model: "gemini-2.5-flash",
-		api: "google",
-		ai: "Io",
-		conversation: "conversation1",
-		apiStatus: online,
-	}
-
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	statusPanel := statusPanel{
 		spinner: s,
 		status: AtEase,
 	}
+	
+	activeAI, err := db.GetActiveAI(database)
+	if err != nil {
+		fmt.Printf("no initial ai %w", err)
+		os.Exit(1)
+	}
+	asciiPath, _:= db.GetAIAsciiPath(database, activeAI.ID)
+	asciiContent := loadAscii(asciiPath)
+
 
 	return Model{
-		db:			 db,
-		core:		 ai.NewCore(),
+		database:	 database,
+		ai:			 activeAI,
+		conversation: db.Conversation{}, // Empty struct instead of nil
+		aicore:		 ai.NewCore(),
 		viewport:    vp,
 		textarea:    ta,
-		messages:    []Message{},
-		ascii:		 loadAscii(),
+		ascii:		 asciiContent,
 		width:       80,
 		height:      24,
-		infoPanel: 	 infoPanel,
 		statusPanel: statusPanel,
 		err:         nil,
 	}
@@ -186,6 +190,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case AIResponseMsg:
+		// Save to database and add to display cache
+		_ = db.SaveMessage(m.database, m.conversation.ID, "assistant", msg.message.Content)
 		m.messages = append(m.messages, msg.message)
 		m.statusPanel.status = AtEase
 		if m.viewport.Height > 0 {
@@ -196,7 +202,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case AIStreamStartMsg:
 		// Add empty bot message immediately
-		m.messages = append(m.messages, Message{Role: "bot", Message: ""})
+		m.messages = append(m.messages, types.Message{Role: "assistant", Content: ""})
 		m.statusPanel.status = Processing
 		if m.viewport.Height > 0 {
 			m.viewport.SetContent(m.formatMessages())
@@ -207,8 +213,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case AIStreamChunkMsg:
 		// Append chunk to last bot message
-		if len(m.messages) > 0 && m.messages[len(m.messages)-1].Role == "bot" {
-			m.messages[len(m.messages)-1].Message += msg.chunk
+		if len(m.messages) > 0 && m.messages[len(m.messages)-1].Role == "assistant" {
+			m.messages[len(m.messages)-1].Content += msg.chunk
 		}
 		// Update viewport and continue reading next chunk
 		if m.viewport.Height > 0 {
@@ -254,10 +260,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case tea.KeyEnter:
 			userInput := m.textarea.Value()
-			userMessage := Message{
-				Message: userInput,
+			
+			// Don't send empty messages
+			if strings.TrimSpace(userInput) == "" {
+				return m, nil
+			}
+
+			// create conversation if none is active
+			if m.conversation.ID == 0 {
+				conv, _ := db.CreateConversation(m.database, userInput, m.ai.ID)
+				m.conversation = conv
+			}
+
+			userMessage := types.Message{
+				Content: userInput,
 				Role: "user",
 			}
+			// Save to database
+			_ = db.SaveMessage(m.database, m.conversation.ID, "user", userInput)
 			m.messages = append(m.messages, userMessage)
 			m.statusPanel.status = Processing
 
@@ -396,9 +416,9 @@ func (m Model) formatMessages() string {
 		var styledMessage string
 		switch msg.Role {
 		case "user":
-			styledMessage = userStyle.Render(msg.Message)
-		case "bot":
-			styledMessage = botStyle.Render(msg.Message)
+			styledMessage = userStyle.Render(msg.Content)
+		case "assistant":
+			styledMessage = botStyle.Render(msg.Content)
 		}
 		content.WriteString(styledMessage + "\n")
 		lastRole = msg.Role
@@ -408,28 +428,22 @@ func (m Model) formatMessages() string {
 
 func (m Model) getAIResponse() tea.Cmd {
 	return func() tea.Msg {
-		// Convert chat messages to API format
-		apiMessages := make([]ai.APIMessage, len(m.messages))
-		for i, msg := range m.messages {
-			apiMessages[i] = ai.APIMessage{
-				Role:    msg.Role,
-				Content: msg.Message,
-			}
-		}
+		// Use messages directly (already in correct format)
+		apiMessages := m.messages
 		
-		response, err := m.core.API.GetResponse(apiMessages)
+		response, err := m.aicore.API.GetResponse(apiMessages)
 		if err != nil {
 			return AIResponseMsg{
-				message: Message{
-					Role:    "bot",
-					Message: fmt.Sprintf("Error: %v", err),
+				message: types.Message{
+					Role:    "assistant",
+					Content: fmt.Sprintf("Error: %v", err),
 				},
 			}
 		}
 		return AIResponseMsg{
-			message: Message{
-				Role:    "bot",
-				Message: response,
+			message: types.Message{
+				Role:    "assistant",
+				Content: response,
 			},
 		}
 	}
@@ -437,14 +451,8 @@ func (m Model) getAIResponse() tea.Cmd {
 
 func (m Model) getAIStreamingResponse(streamingAPI api.StreamingAPI) tea.Cmd {
 	return func() tea.Msg {
-		// Convert chat messages to API format
-		apiMessages := make([]ai.APIMessage, len(m.messages))
-		for i, msg := range m.messages {
-			apiMessages[i] = ai.APIMessage{
-				Role:    msg.Role,
-				Content: msg.Message,
-			}
-		}
+		// Use messages directly (already in correct format)
+		apiMessages := m.messages
 		
 		// Start streaming
 		textChan, errChan := streamingAPI.GetStreamingResponse(apiMessages)
@@ -471,7 +479,7 @@ func (m Model) readNextChunk(textChan <-chan string, errChan <-chan error) tea.C
 		case err := <-errChan:
 			if err != nil {
 				return AIResponseMsg{
-					message: Message{Role: "bot", Message: fmt.Sprintf("Error: %v", err)},
+					message: types.Message{Role: "assistant", Content: fmt.Sprintf("Error: %v", err)},
 				}
 			}
 			return AIStreamCompleteMsg{}
@@ -480,7 +488,7 @@ func (m Model) readNextChunk(textChan <-chan string, errChan <-chan error) tea.C
 }
 
 func (m Model) callAI(userInput string) tea.Cmd {
-	if streamingAPI, ok := m.core.API.(api.StreamingAPI); ok {
+	if streamingAPI, ok := m.aicore.API.(api.StreamingAPI); ok {
 		return m.getAIStreamingResponse(streamingAPI)
 	} else {
 		return m.getAIResponse()
@@ -490,16 +498,15 @@ func (m Model) callAI(userInput string) tea.Cmd {
 func (m Model) makeInfoPanel() string {
 	currentTime := time.Now().Format("15:04:05")
 
-	// apistatus color
-	var statusColor string
-	switch m.infoPanel.apiStatus {
-	case online:
-		statusColor = "10"
-	case offline:
-		statusColor = "9"
+	// Get conversation name or default
+	conversationName := "No conversation"
+	if m.conversation.ID != 0 {
+		conversationName = m.conversation.Name
 	}
+
+	// Status styling (hardcoded to online for now)
 	statusStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(statusColor)).
+		Foreground(lipgloss.Color("10")).
 		Bold(true)
 
 	// Combine time styling and centering
@@ -515,15 +522,15 @@ func (m Model) makeInfoPanel() string {
 		centerTimeStyle.Render(currentTime),
 		"",
 		"",
-		fmt.Sprintf("%s %s", labelStyle.Render("ai:"), valueStyle.Render(m.infoPanel.ai)),
+		fmt.Sprintf("%s %s", labelStyle.Render("ai:"), valueStyle.Render(m.ai.Name)),
 		"",
-		fmt.Sprintf("%s %s", labelStyle.Render("api:"), valueStyle.Render(m.infoPanel.api)),
+		fmt.Sprintf("%s %s", labelStyle.Render("api:"), valueStyle.Render(m.ai.API)),
 		"",
-		fmt.Sprintf("%s %s", labelStyle.Render("model:"), valueStyle.Render(m.infoPanel.model)),
+		fmt.Sprintf("%s %s", labelStyle.Render("model:"), valueStyle.Render(m.ai.Model)),
 		"",
-		fmt.Sprintf("%s %s", labelStyle.Render("conversation:"), valueStyle.Render(m.infoPanel.conversation)),
+		fmt.Sprintf("%s %s", labelStyle.Render("conv:"), valueStyle.Render(conversationName)),
 		"",
-		fmt.Sprintf("%s %s", labelStyle.Render("status:"), statusStyle.Render(m.infoPanel.apiStatus.String())),
+		fmt.Sprintf("%s %s", labelStyle.Render("status:"), statusStyle.Render("online")),
 		"",
 	)
 }
@@ -574,8 +581,8 @@ func verticalSeparator(height int) string {
 		Render(strings.Join(lines, "\n"))
 }
 
-func loadAscii() string {
-	artBytes, err := os.ReadFile("avatar_art.txt")
+func loadAscii(path string) string {
+	artBytes, err := os.ReadFile(path)
 	if err != nil {
 		return "🤖"
 	}

@@ -15,8 +15,8 @@ type Conversation struct {
 
 func CreateConversation(db *sql.DB, firstMessage string, ai_id int) (Conversation, error) {
 	var conversationName string
-	if len(firstMessage) >= 20 {
-		conversationName = firstMessage[:20] + "..."
+	if len(firstMessage) >= 15 {
+		conversationName = firstMessage[:15] + "..."
 	} else {
 		conversationName = time.Now().Format("2006-01-02 15:04:05")
 	}
