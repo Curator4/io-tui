@@ -8,6 +8,7 @@ import (
 	"strings"
 	"os"
 	"time"
+	"database/sql"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
@@ -107,6 +108,7 @@ type statusPanel struct {
 }
 
 type Model struct {
+	db			*sql.DB
 	core		ai.Core
 	viewport    viewport.Model
 	textarea    textarea.Model
@@ -119,7 +121,7 @@ type Model struct {
 	err         error
 }
 
-func InitialModel() Model {
+func InitialModel(db *sql.DB) Model {
 
 
 
@@ -158,7 +160,8 @@ func InitialModel() Model {
 	}
 
 	return Model{
-		core:		ai.NewCore(),
+		db:			 db,
+		core:		 ai.NewCore(),
 		viewport:    vp,
 		textarea:    ta,
 		messages:    []Message{},
