@@ -83,12 +83,12 @@ Yes, the closer the deadline became, the more vibe coding I did. I feature creep
         - [x] standard request
         - [x] calls with conversation context
 
-- [ ] submission ready
+- [x] submission ready
     - [x] "runnable in 5 minutes" apikey considerations
     - [x] test on other machines
     - [x] "Your GitHub repo must have a README.md with an explanation of the project, what it does, how to run it, etc"
     - [x] add disclaimer about partial use of AI to readme
-    - [ ] social post
+    - [x] social post
 
 pref before turnin
 - [ ] dynamic size for ascii on manifestation
@@ -96,7 +96,6 @@ pref before turnin
     - [x] set it up as tool
     - [x] tool should call the set ai command too, and print short introduction
     - [x] tool call ai to make prompt
-- [ ] default ais, io and makise
 - [ ] emoji github.com/kyokomi/emoji
 - [ ] openai
 - [ ] changing terminal layout depending on aspect ratio
