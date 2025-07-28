@@ -34,7 +34,7 @@ Extra: For the [boot.dev](https://boot.dev) **hackathon** I "pushed the api key 
 - `/quit`, `:q`
 - `/manifest <name> <url>`
 - Tell ai to manifest character with an imagelink and it will call manifest itself, setting an appropiate prompt.
-- **IMPORTANT** when *manifesting*, pass the image as directl ink, ie. it needs to end with .jpg or .png
+- **IMPORTANT** when *manifesting*, pass the image as direct link, ie. it needs to end with .jpg or .png
 
 ##  features / roadmap
 

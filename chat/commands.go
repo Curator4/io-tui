@@ -464,7 +464,6 @@ func (m Model) showCommands() (tea.Model, tea.Cmd) {
 
 📋 Listing:
   /list ai(s)              - Show all available AIs
-  /list conversations      - Show all conversations
   /list api(s)             - Show all available APIs
   /list model(s) <api>     - Show models for specific API
 
