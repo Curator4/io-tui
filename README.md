@@ -20,9 +20,20 @@ to run use:
 ```
 export GEMINI_API_KEY="your_api_key"
 ```
+### hackathon
+Extra: For the [boot.dev](https://boot.dev) **hackathon** I "pushed the api key to public repo" 🤡. Uncomment the key in *demo_api_key.txt*, and program should work 👍
 
-Extra: For **hackathon** I "pushed the api key to public repo" 🤡. Uncomment the key in *demo_api_key.txt*, and program should work 👍
-
+### commands
+- `/commands`, `/help`
+- `/list [ais|apis|models <api]`
+- `/set [ai|api|model|prompt <text>]`
+- `/resume`
+- `/clear`
+- `/rename`
+- `/show prompt`
+- `/quit`, `:q`
+- `/manifest <name> <url>`
+- Tell ai to manifest character with an imagelink and it will call manifest itself, setting an appropiate prompt.
 
 ##  features / roadmap
 
