@@ -36,6 +36,9 @@ Extra: For the [boot.dev](https://boot.dev) **hackathon** I "pushed the api key 
 - Tell ai to manifest character with an imagelink and it will call manifest itself, setting an appropiate prompt.
 - **IMPORTANT** when *manifesting*, pass the image as direct link, ie. it needs to end with .jpg or .png
 
+## disclaimer
+Yes, the closer the deadline became, the more vibe coding I did. I feature creeped too much to make it otherwise. 😔
+
 ##  features / roadmap
 
 - [x] basic functionality
@@ -132,3 +135,17 @@ pref before turnin
         - [ ] hooks
     - [ ] fine tuned chatlogs
     - [ ] local inference
+
+## ranting
+Codebase is a mess because of the vibe coding 🍝.
+
+Because of this, I wouldn't use this as resume project to demonstrate code quality 🤣.
+
+Imo the core functionality is cool tho, it requests an imagefile, gets color palette, gets ascii, then stores them in database.
+
+I learned a lot about stuff I hadn't touched before including bubbletea et al, sqlite, random go libraries. 
+
+Also, using ascii is cringe, i spent the entire first day trying to make images work with bubbletea formatting. Never again.
+
+If i had to do this again i would do web.
+
