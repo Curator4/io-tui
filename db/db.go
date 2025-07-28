@@ -53,15 +53,8 @@ func initialSetup(db *sql.DB) error {
 	}
 	
 	// Create seed data
-	if err := CreateAI(db, "Default", defaultPrompt, defaultAPI, defaultModel, defaultAsciiPath, true); err != nil {
+	if err := CreateAI(db, "Default", defaultPrompt, defaultAPI, defaultModel, defaultASCII, defaultPaletteJSON, true); err != nil {
 		return fmt.Errorf("failed to create default ai: %w", err)
-	}
-	if err := CreateAI(db, "Io", ioPrompt, defaultAPI, defaultModel, ioAsciiPath, false); err != nil {
-		return fmt.Errorf("failed to create io ai: %w", err)
-	}
-
-	if err := CreateAI(db, "Makise", makisePrompt, defaultAPI, defaultModel, makiseAsciiPath, false); err != nil {
-		return fmt.Errorf("failed to create makise ai: %w", err)
 	}
 	
 	return nil
@@ -76,7 +69,8 @@ func createTables(db *sql.DB) error {
 		system_prompt TEXT,
 		api TEXT NOT NULL,
 		model TEXT NOT NULL,
-		ascii_art_path TEXT DEFAULT 'ascii/io_ascii.txt',
+		ascii TEXT,
+		palette_json TEXT,
 		is_active BOOLEAN DEFAULT FALSE,
 		created DATETIME DEFAULT CURRENT_TIMESTAMP
 	);

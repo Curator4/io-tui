@@ -23,20 +23,15 @@ I considered a few "platforms" for this project, discord bot, server hosted xter
     - [ ] social post
 
 pref before turnin
+- [ ] background colors
+- [ ] dynamic size for ascii on manifestation
 - [ ] create ai with colors
-    - [ ] make entire programs color usage depend on a array of colors (palette)
-    - [ ] extend database with palette_json for ai
-    - [ ] update existing ais with palette on init
-    - [ ] ai creation
-        - [ ] call imgur link
-        - [ ] use https://github.com/cascax/colorthief-go to extract palette
-        - [ ] use https://github.com/qeesung/image2ascii to create ascii
-        - [ ] store ascii in ascii/name_ascii.txt
-        - [ ] store palette in model, or create and then return AI object with palette
     - [ ] set it up as tool
     - [ ] tool should call the set ai command too, and print short introduction
-- [ ] change ascii to be stored in database, not filepath
+    - [ ] tool call ai to make prompt
 - [ ] emoji github.com/kyokomi/emoji
+- [ ] openai
+- [ ] changing terminal layout depending on aspect ratio
 
 - [ ] features
     - [x] database
@@ -78,8 +73,8 @@ pref before turnin
         - [x] /set prompt, api/model maybe
         - [ ] maybe a tool to select ai
             - [ ] maybe this should also call some request that sends introduction?
-        - [ ] create ai
-            - [ ] dynamically create ascii from filepath or imgur link, currently use terminal command, save in standard /ascii folder maybe
+        - [x] create ai
+            - [x] dynamically create ascii from filepath or imgur link, currently use terminal command, save in standard /ascii folder maybe
             - [ ] tool for ai to call to create ascii, with image link for ascii and prompt, defaults for api/model
     - [ ] memory
         - [ ] new table to store memories, foreign kei ai_id, CRUD

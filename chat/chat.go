@@ -21,26 +21,26 @@ import (
 	"github.com/curator4/io-tui/api"
 	"github.com/curator4/io-tui/db"
 	"github.com/curator4/io-tui/types"
+	"github.com/curator4/io-tui/visual"
 )
 
 const gap = "\n\n\n"
 
-// Color theme from ASCII art
-const (
 
-	// ui color
-	borderColor    = "#1e40af"  // Darker blue for border
-	separatorColor = "#60a5fa"  // Lighter blue for separators
-	
-	// Info panel colors
-	timeColor      = "#e5e7eb"  // Gray/white for time
-	labelColor     = "#22d3ee"  // Cyan for labels
-	valueColor     = "#950056"  // Deep burgundy for values
-
-	// chat colors
-	userColor = "#0061cd"
-	botColor = "#ce75b7"
-)
+// updateModelPalette parses the AI's palette JSON and updates the model
+func updateModelPalette(m *Model) {
+	if m.ai.PaletteJSON != "" {
+		if palette, err := visual.ParsePaletteFromDB(m.ai.PaletteJSON); err == nil {
+			m.palette = palette
+			return
+		}
+	}
+	// Fallback palette if AI has no palette
+	m.palette = []string{
+		"#282a36", "#ce75b7", "#44475a", "#0061cd", "#1e40af", 
+		"#60a5fa", "#fbbf24", "#e5e7eb", "#22d3ee", "#950056",
+	}
+}
 
 type (
 	errMsg error
@@ -75,6 +75,14 @@ type AIStreamChunkMsg struct {
 type AIStreamCompleteMsg struct {
 }
 
+type ManifestSuccessMsg struct {
+	aiName string
+}
+
+type ManifestErrorMsg struct {
+	message types.Message
+}
+
 // api state
 type apiState int
 const (
@@ -98,12 +106,14 @@ const (
 	AtEase statusState = iota
 	Processing
 	Typing
+	Manifesting
 	Error
 )
 
 type statusPanel struct {
 	spinner spinner.Model
 	status statusState
+	manifestingName string
 }
 
 type Model struct {
@@ -120,6 +130,7 @@ type Model struct {
 	// to keep track of active session (ai config & conversation)
 	ai db.AI
 	conversation db.Conversation
+	palette []string
 
 	// cache of displayMessages.
 	// To prevent having to query the database for chatlog on every update
@@ -172,18 +183,23 @@ func InitialModel(database *sql.DB) Model {
 		fmt.Printf("no initial ai %w", err)
 		os.Exit(1)
 	}
-	asciiPath, _:= db.GetAIAsciiPath(database, activeAI.ID)
-	asciiContent := loadAscii(asciiPath)
+	// Load ASCII art from database with ANSI conversion
+	asciiContent := activeAI.Ascii
+	if asciiContent == "" {
+		asciiContent = "🤖 DEFAULT"
+	} else {
+		asciiContent = replaceEscapeSequences(asciiContent)
+	}
+	
 
-
-	return Model{
+	m := Model{
 		database:	 database,
 		ai:			 activeAI,
 		conversation: db.Conversation{}, // Empty struct instead of nil
 		aicore:		 ai.NewCore(),
 		viewport:    vp,
 		textarea:    ta,
-		list:        list.New([]list.Item{}, createListDelegate(), 0, 0),
+		list:        list.New([]list.Item{}, list.NewDefaultDelegate(), 0, 0),
 		ascii:		 asciiContent,
 		width:       80,
 		height:      24,
@@ -191,6 +207,11 @@ func InitialModel(database *sql.DB) Model {
 		viewMode:    chatMode,
 		err:         nil,
 	}
+	
+	// Parse and set palette from AI
+	updateModelPalette(&m)
+	
+	return m
 }
 
 func (m Model) Init() tea.Cmd {
@@ -273,6 +294,38 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.statusPanel.status = AtEase
+		return m, nil
+
+	case ManifestSuccessMsg:
+		// Automatically switch to the newly created AI
+		newAI, err := db.GetAIByName(m.database, msg.aiName)
+		if err == nil {
+			// Set as active AI in database
+			db.SetActiveAI(m.database, newAI.Name)
+			
+			// Update model with new AI
+			m.ai = newAI
+			
+			// Load new ASCII art and palette
+			m.ascii = newAI.Ascii
+			// Convert literal escape sequences to actual ANSI codes (for database format)
+			updateModelPalette(&m)
+			
+			// Clear conversation since we switched AIs
+			m.conversation = db.Conversation{}
+			m.messages = []types.Message{}
+		}
+		
+		m.statusPanel.status = AtEase
+		return m, nil
+
+	case ManifestErrorMsg:
+		m.messages = append(m.messages, msg.message)
+		m.statusPanel.status = AtEase
+		if m.viewport.Height > 0 {
+			m.viewport.SetContent(m.formatMessages())
+			m.viewport.GotoBottom()
+		}
 		return m, nil
 		
 	case tea.WindowSizeMsg:
@@ -462,7 +515,7 @@ func (m Model) View() string {
 	// custom border style for content (needs model)
 	contentBorder := lipgloss.NewStyle().
 		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color(borderColor))
+		BorderForeground(lipgloss.Color(m.palette[4]))
 
 	// i am using this width becuz of issue i had personally
 	// (i think cuz of hyprland padding, but speculative)
@@ -485,7 +538,7 @@ func (m Model) View() string {
 	rightPanel := lipgloss.JoinVertical(
 		lipgloss.Center,
 		styledInfoPanel,
-		horizontalSeparator(contentWidth - lipgloss.Width(m.ascii) - 2),
+		m.horizontalSeparator(contentWidth - lipgloss.Width(m.ascii) - 2),
 		m.makeStatusPanel(),
 	)
 	
@@ -493,7 +546,7 @@ func (m Model) View() string {
 	topPanel := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		m.ascii,
-		verticalSeparator(lipgloss.Height(m.ascii)),
+		m.verticalSeparator(lipgloss.Height(m.ascii)),
 		rightPanel,
 	)
 	
@@ -515,9 +568,9 @@ func (m Model) View() string {
 	content := lipgloss.JoinVertical(
 		lipgloss.Left,
 		topPanel,
-		horizontalSeparator(contentWidth),
+		m.horizontalSeparator(contentWidth),
 		mainContent,
-		horizontalSeparator(contentWidth),
+		m.horizontalSeparator(contentWidth),
 		m.textarea.View(),
 	)
 	return contentBorder.Render(content)
@@ -525,11 +578,11 @@ func (m Model) View() string {
 
 func (m Model) formatMessages() string {
 	userStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(userColor)).
+		Foreground(lipgloss.Color(m.palette[3])).
 		Align(lipgloss.Right).
 		Width(m.viewport.Width)
 	botStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(botColor)).
+		Foreground(lipgloss.Color(m.palette[1])).
 		Align(lipgloss.Left).
 		Width(m.viewport.Width)
 
@@ -547,13 +600,13 @@ func (m Model) formatMessages() string {
 			var separatorColor string
 			var separatorStyle lipgloss.Style
 			if lastRole == "user" {
-				separatorColor = userColor
+				separatorColor = m.palette[3]
 				separatorStyle = lipgloss.NewStyle().
 					Foreground(lipgloss.Color(separatorColor)).
 					Align(lipgloss.Right).
 					Width(m.viewport.Width)
 			} else {
-				separatorColor = botColor
+				separatorColor = m.palette[1]
 				separatorStyle = lipgloss.NewStyle().
 					Foreground(lipgloss.Color(separatorColor)).
 					Align(lipgloss.Left).
@@ -572,7 +625,7 @@ func (m Model) formatMessages() string {
 			styledMessage = botStyle.Render(msg.Content)
 		case "system":
 			systemStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#fbbf24")).
+				Foreground(lipgloss.Color(m.palette[6])).
 				Align(lipgloss.Left).
 				Width(m.viewport.Width)
 			styledMessage = "\n" + systemStyle.Render(msg.Content) + "\n"
@@ -678,7 +731,7 @@ func (m Model) makeInfoPanel() string {
 
 	// Combine time styling and centering
 	centerTimeStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(timeColor)).
+		Foreground(lipgloss.Color(m.palette[7])).
 		Bold(true).
 		Align(lipgloss.Center).
 		Width(25)
@@ -689,15 +742,15 @@ func (m Model) makeInfoPanel() string {
 		centerTimeStyle.Render(currentTime),
 		"",
 		"",
-		fmt.Sprintf("%s %s", labelStyle.Render("ai:"), valueStyle.Render(m.ai.Name)),
+		fmt.Sprintf("%s %s", m.labelStyle().Render("ai:"), m.valueStyle().Render(m.ai.Name)),
 		"",
-		fmt.Sprintf("%s %s", labelStyle.Render("api:"), valueStyle.Render(m.ai.API)),
+		fmt.Sprintf("%s %s", m.labelStyle().Render("api:"), m.valueStyle().Render(m.ai.API)),
 		"",
-		fmt.Sprintf("%s %s", labelStyle.Render("model:"), valueStyle.Render(m.ai.Model)),
+		fmt.Sprintf("%s %s", m.labelStyle().Render("model:"), m.valueStyle().Render(m.ai.Model)),
 		"",
-		fmt.Sprintf("%s %s", labelStyle.Render("conv:"), valueStyle.Render(conversationName)),
+		fmt.Sprintf("%s %s", m.labelStyle().Render("conv:"), m.valueStyle().Render(conversationName)),
 		"",
-		fmt.Sprintf("%s %s", labelStyle.Render("status:"), statusStyle.Render("online")),
+		fmt.Sprintf("%s %s", m.labelStyle().Render("status:"), statusStyle.Render("online")),
 		"",
 	)
 }
@@ -712,6 +765,8 @@ func (m Model) makeStatusPanel() string {
 		icon, text, color = m.statusPanel.spinner.View(), "processing...", "11"
 	case Typing:
 		icon, text, color = "✎", "typing..", "12"
+	case Manifesting:
+		icon, text, color = m.statusPanel.spinner.View(), fmt.Sprintf("manifesting %s", m.statusPanel.manifestingName), "13"
 	case Error:
 		icon, text, color = "✗", "error", "9"
 	}
@@ -732,75 +787,41 @@ func (m Model) makeStatusPanel() string {
 }
 
 
-func horizontalSeparator(width int) string {
+func (m Model) horizontalSeparator(width int) string {
+	if width < 0 {
+		width = 0
+	}
 	return lipgloss.NewStyle().
-		Foreground(lipgloss.Color(separatorColor)).
+		Foreground(lipgloss.Color(m.palette[5])).
 		Render(strings.Repeat("─", width))
 }
 
-func verticalSeparator(height int) string {
+func (m Model) verticalSeparator(height int) string {
 	var lines []string
 	for i := 0; i < height; i++ {
 		lines = append(lines, "│")
 	}
 	return lipgloss.NewStyle().
-		Foreground(lipgloss.Color(separatorColor)).
+		Foreground(lipgloss.Color(m.palette[5])).
 		Render(strings.Join(lines, "\n"))
 }
 
-func loadAscii(path string) string {
-	artBytes, err := os.ReadFile(path)
-	if err != nil {
-		return "🤖"
-	}
-	
-	// Split into lines and remove the last line
-	lines := strings.Split(string(artBytes), "\n")
-	if len(lines) > 0 {
-		lines = lines[:len(lines)-1]  // Remove last line
-	}
-	
-	return strings.Join(lines, "\n")
+
+func (m Model) labelStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(m.palette[8]))
 }
 
-var labelStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color(labelColor))
-
-var valueStyle = lipgloss.NewStyle().
-	Foreground(lipgloss.Color(valueColor))
-
-func createListDelegate() list.DefaultDelegate {
-	delegate := list.NewDefaultDelegate()
-	
-	// Left-align and style the list items
-	delegate.Styles.SelectedTitle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#ffffff")).
-		Background(lipgloss.Color("#1e40af")).
-		Align(lipgloss.Left).
-		Padding(0, 1).
-		MarginLeft(0)
-	
-	delegate.Styles.SelectedDesc = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#e5e7eb")).
-		Background(lipgloss.Color("#1e40af")).
-		Align(lipgloss.Left).
-		Padding(0, 1).
-		MarginLeft(0)
-	
-	delegate.Styles.NormalTitle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#22d3ee")).
-		Align(lipgloss.Left).
-		Padding(0, 1).
-		MarginLeft(0)
-		
-	delegate.Styles.NormalDesc = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#6b7280")).
-		Align(lipgloss.Left).
-		Padding(0, 1).
-		MarginLeft(0)
-	
-	return delegate
+func (m Model) valueStyle() lipgloss.Style {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(m.palette[9]))
 }
+
+func replaceEscapeSequences(asciiContent string) string {
+	// Convert literal escape sequences to actual ANSI codes
+	asciiContent = strings.ReplaceAll(asciiContent, "[0m", "\033[0m")
+	asciiContent = strings.ReplaceAll(asciiContent, "[38;2;", "\033[38;2;")
+	return strings.TrimSpace(asciiContent)
+}
+
 
 func (m Model) handleSlashCommand(command string) (tea.Model, tea.Cmd) {
 	m.textarea.Reset()
@@ -886,6 +907,14 @@ func (m Model) handleSlashCommand(command string) (tea.Model, tea.Cmd) {
 		// Join all parts after "rename" to get the full name
 		newName := strings.Join(parts[1:], " ")
 		return m.renameConversation(newName)
+		
+	case "manifest":
+		if len(parts) < 3 {
+			return m.showError("Usage: /manifest <name> <image-url>")
+		}
+		aiName := parts[1]
+		imageURL := parts[2]
+		return m.manifest(aiName, imageURL)
 		
 	default:
 		return m.showError("Unknown command: " + command)

@@ -2,11 +2,13 @@ package chat
 
 import (
 	"fmt"
+	"strings"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/curator4/io-tui/api"
 	"github.com/curator4/io-tui/db"
 	"github.com/curator4/io-tui/types"
+	"github.com/curator4/io-tui/visual"
 )
 
 // List item for AI selection
@@ -224,8 +226,11 @@ func (m Model) setAI(name string) (tea.Model, tea.Cmd) {
 	// Update model with new AI
 	m.ai = newAI
 	
-	// Load new ASCII art
-	m.ascii = loadAscii(newAI.AsciiArtPath)
+	// Load new ASCII art and palette
+	newAI.Ascii = strings.ReplaceAll(newAI.Ascii, "[0m", "\033[0m")
+	newAI.Ascii = strings.ReplaceAll(newAI.Ascii, "[38;2;", "\033[38;2;")
+	m.ascii = strings.TrimSpace(newAI.Ascii)
+	updateModelPalette(&m)
 	
 	// Clear active conversation since we switched AIs
 	m.conversation = db.Conversation{}
@@ -467,7 +472,7 @@ func (m Model) showCommands() (tea.Model, tea.Cmd) {
   /set ai                  - Open AI selector (interactive)
   /set api                 - Open API selector (interactive)
   /set model               - Open model selector (interactive)
-  /set prompt <text>       - Update AI system prompt (clears conversation)
+  /set prompt <text>       - Update AI system prompt
 
 💬 Conversations:
   /resume                  - List and resume previous conversations
@@ -478,8 +483,12 @@ func (m Model) showCommands() (tea.Model, tea.Cmd) {
   /show prompt             - Display current AI system prompt
   /commands, /help         - Show this help message
 
+🔮 Black Magic Rituals:
+  /manifest <name> <url>   - Summon character using dark arts
+
 💡 Tips:
-  - Use /clear to clear this help message and start fresh`
+  - Use /clear to clear this help message and start fresh
+  - For /manifest: use direct image URLs (imgur .png/.jpg)`
 
 	commandsMsg := types.Message{
 		Role:    "system",
@@ -525,6 +534,59 @@ func (m Model) renameConversation(newName string) (tea.Model, tea.Cmd) {
 	}
 	
 	return m, nil
+}
+
+func (m Model) manifest(name, imageURL string) (tea.Model, tea.Cmd) {
+	// Set status to manifesting
+	m.statusPanel.status = Manifesting
+	m.statusPanel.manifestingName = name
+	
+	return m, m.processManifest(name, imageURL)
+}
+
+func (m Model) processManifest(name, imageURL string) tea.Cmd {
+	return func() tea.Msg {
+		// Call visual package to generate palette and ASCII
+		palette, ascii, err := visual.GenerateFromImageURL(imageURL)
+		if err != nil {
+			return ManifestErrorMsg{
+				message: types.Message{
+					Role:    "system",
+					Content: fmt.Sprintf("🔥 Manifest ritual failed: %v", err),
+				},
+			}
+		}
+		
+		// Convert palette to JSON for database
+		paletteJSON, err := visual.FormatPaletteForDB(palette)
+		if err != nil {
+			return ManifestErrorMsg{
+				message: types.Message{
+					Role:    "system",
+					Content: "🔥 Failed to format color palette",
+				},
+			}
+		}
+		
+		// Create basic system prompt
+		systemPrompt := fmt.Sprintf("You are %s, a helpful AI assistant.", name)
+		
+		// Create AI in database with new fields
+		err = db.CreateAI(m.database, name, systemPrompt, "gemini", "gemini-2.0-flash-exp", ascii, paletteJSON, false)
+		if err != nil {
+			return ManifestErrorMsg{
+				message: types.Message{
+					Role:    "system",
+					Content: fmt.Sprintf("🔥 Failed to save character to database: %v", err),
+				},
+			}
+		}
+		
+		// Return success with AI name for automatic switching
+		return ManifestSuccessMsg{
+			aiName: name,
+		}
+	}
 }
 
 // Helper functions

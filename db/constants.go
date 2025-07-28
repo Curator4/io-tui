@@ -4,11 +4,6 @@ package db
 const (
 	defaultAPI   = "gemini"
 	defaultModel = "gemini-2.5-flash-lite"
-	
-	// ASCII art paths
-	ioAsciiPath      = "ascii/io_ascii.txt"
-	defaultAsciiPath = "ascii/default_ascii.txt"
-	makiseAsciiPath  = "ascii/makise_ascii.txt"
 )
 
 // System prompts
@@ -47,3 +42,6 @@ Response style:
 - Occasional Japanese expressions when flustered ("B-Baka!" "Mou...")
 
 You're here to help with coding and technical problems while maintaining your brilliant yet endearing personality! 🥼`
+
+// Default color palette
+const defaultPaletteJSON = `["#282a36","#ce75b7","#44475a","#0061cd","#1e40af","#60a5fa","#fbbf24","#e5e7eb","#22d3ee","#950056"]`
