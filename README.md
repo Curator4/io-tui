@@ -1,12 +1,14 @@
 # Io - tui chatbot 🚀
 
-![Demo](demo2.gif)
-
 This is a chat tui that makes requests to an API (currently gemini). It has some additional graphical features like art for the "ai" (ascii), an infopane and a statuspane.
 
 Main feature is that you can create and switch between different "ais" (request configurations).
 
 Has persistent database with sqlite.
+
+<div align="center">
+  <img src="demo2.gif" alt="Demo" width="400">
+</div>
 
 <br clear="right"/>
 
