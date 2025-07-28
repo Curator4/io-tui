@@ -497,8 +497,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		
 		asciiHeight := lipgloss.Height(m.ascii)
-		m.viewport.Width = msg.Width - 2
-		m.textarea.SetWidth(msg.Width - 2)
+		m.viewport.Width = msg.Width
+		m.textarea.SetWidth(msg.Width)
 		
 		// Calculate height with minimum safety check
 		newHeight := msg.Height - m.textarea.Height() - lipgloss.Height(gap) - asciiHeight
@@ -681,11 +681,7 @@ func (m Model) View() string {
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(m.palette[3]))
 
-	// i am using this width becuz of issue i had personally
-	// (i think cuz of hyprland padding, but speculative)
-	// Point being, it might be messed up for you. works on my machine 🤷
-	// maybe remove the -2 in normal setup
-	contentWidth := m.width -2
+	contentWidth := m.width
 	
 	// Calculate heights for right panel components
 	statusPanelHeight := 3
