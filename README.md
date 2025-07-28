@@ -42,8 +42,9 @@ For now only google gemini is supported, and for that 2 models only.
 I had plans to make shifting between api-provider/models easy, fast, intuitive. But what can you do.
 
 ## disclaimer
-Yes, the closer the deadline became, the more vibe coding I did. I feature creeped too much to make it otherwise. 😔
+Yes, the closer the deadline became, the more vibe coding I did. I feature creeped too much to make it otherwise 😔
 
+**Anything after this is irrelevant.**
 ##  features / roadmap
 
 - [x] basic functionality
