@@ -1,6 +1,18 @@
 # Io - tui chatbot
+This is a chat tui that makes requests to an API (currently gemini). It has some additional graphical features like art for the "ai" (ascii), an infopane and a statuspane.
+Main feature is that you can create and switch between different "ais" (request configurations). Has persistent database with sqlite.
 
-I considered a few "platforms" for this project, discord bot, server hosted xterm bot. But in the interest of simplicity and project limitations I decided to do a tui.
+## usage guide
+to run use:
+`go run main.go`
+
+**IMPORTANT**: to run you need an apikey (only gemini supported for now). Default behavior is to load apikey from your exports in .bashrc/.zshrc. If you have your own api key set:
+```
+export GEMINI_API_KEY="your_api_key"
+```
+
+Extra: For **hackathon** I "pushed the api key to public repo" 🤡. Uncomment the key in *demo_api_key.txt*, and program should work 👍
+
 
 ##  features / roadmap
 
