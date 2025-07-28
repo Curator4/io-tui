@@ -90,16 +90,16 @@ Yes, the closer the deadline became, the more vibe coding I did. I feature creep
     - [x] add disclaimer about partial use of AI to readme
     - [x] social post
 
-pref before turnin
-- [ ] dynamic size for ascii on manifestation
-- [x] create ai with colors
-    - [x] set it up as tool
-    - [x] tool should call the set ai command too, and print short introduction
-    - [x] tool call ai to make prompt
-- [ ] emoji github.com/kyokomi/emoji
-- [ ] openai
-- [ ] changing terminal layout depending on aspect ratio
-- [ ] copy paste
+- [ ] pref before turnin
+  - [ ] dynamic size for ascii on manifestation
+  - [x] create ai with colors
+      - [x] set it up as tool
+      - [x] tool should call the set ai command too, and print short introduction
+      - [x] tool call ai to make prompt
+  - [ ] emoji github.com/kyokomi/emoji
+  - [ ] openai
+  - [ ] changing terminal layout depending on aspect ratio
+  - [ ] copy paste
 
 - [ ] features
     - [x] database
