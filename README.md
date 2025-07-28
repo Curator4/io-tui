@@ -14,7 +14,7 @@ Has persistent database with sqlite.
 
 ## usage guide
 to run use:
-`go run main.go`
+`go run .`
 
 **IMPORTANT**: to run you need an apikey (only gemini supported for now). Default behavior is to load apikey from your exports in .bashrc/.zshrc. If you have your own api key set:
 ```
