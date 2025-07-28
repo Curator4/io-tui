@@ -15,7 +15,7 @@ Thanks to all organizers and participants.
 
 <br clear="right"/>
 
-## usage guide
+## usage guide 📋
 to run, `clone` and do:
 ```
 go mod tidy
@@ -27,12 +27,12 @@ go run .
 ```
 export GEMINI_API_KEY="your_api_key"
 ```
-### hackathon
+### hackathon 🛠️
 Extra: For the [boot.dev](https://boot.dev) **hackathon** I "pushed the api key to public repo" 🤡. Uncomment the key in *demo_api_key.txt*, and program should work 👍.
 
 I repeat *uncomment the key and program will work* (reads the demo_api_key.txt file if nothing is in env)
 
-### terminal UI
+### terminal UI </>
 must run in a terminal that supports modern features and colors, utf-8 etc. I used kitty, but it worked on my windows terminal aswell.
 
 I had more more plans to develop a more modular ui structure, ascii size dependant on terminal size, support for "wide" vs "tall" terminals. But I didn't come around to it. I made it to run and look good in my own personal terminal when using ~half monitor width and full monitor height. 1080p. Not even taking terminal text size into account. It will look bad on any other setting, so I suggest u do the same. Even then yours might (probably) look bad or off center or something. 
@@ -41,7 +41,7 @@ When I run on my Microsoft Windows client all the content doesn't fill window co
 
 It is what it is, works on my machine 🤷‍♂️
 
-### commands
+### commands 📝
 - `/commands`, `/help`
 - `/list [ais|apis|models <api]`
 - `/set [ai|api|model|prompt <text>]`
@@ -54,7 +54,7 @@ It is what it is, works on my machine 🤷‍♂️
 - Tell ai to manifest character with an imagelink and it will call manifest itself, setting an appropiate prompt.
 - **IMPORTANT** when *manifesting*, pass the image as direct link, ie. it needs to end with .jpg or .png
 
-### api
+### api 🌐
 For now only google gemini is supported, and for that 2 models only.
 
 I had plans to make shifting between api-provider/models easy, fast, intuitive. But what can you do.
@@ -167,7 +167,7 @@ pref before turnin
     - [ ] fine tuned chatlogs
     - [ ] local inference
 
-## ranting
+## ranting 👻
 Codebase is a mess because of the vibe coding 🍝.
 
 Because of this, I wouldn't use this as resume project to demonstrate code quality 🤣.
