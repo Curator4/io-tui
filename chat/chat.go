@@ -730,7 +730,7 @@ func (m Model) getAIResponse() tea.Cmd {
 			response, err := functionAPI.GetResponseWithFunctions(apiMessages, m.ai.SystemPrompt)
 			if err != nil {
 				// Clean up error message
-				errorContent := "❌ No API key configured. Please set your GEMINI_API_KEY or update demo_api_key.txt"
+				errorContent := "❌ No API key configured. Please set GEMINI_API_KEY or GOOGLE_API_KEY, or update demo_api_key.txt"
 				if !strings.Contains(err.Error(), "API key") && 
 				   !strings.Contains(err.Error(), "Demo_Key_Replace") && 
 				   !strings.Contains(err.Error(), "invalid header field value") {
@@ -775,7 +775,7 @@ func (m Model) getAIResponse() tea.Cmd {
 		response, err := m.aicore.API.GetResponse(apiMessages, m.ai.SystemPrompt)
 		if err != nil {
 			// Clean up error message
-			errorContent := "❌ No API key configured. Please set your GEMINI_API_KEY or update demo_api_key.txt"
+			errorContent := "❌ No API key configured. Please set GEMINI_API_KEY or GOOGLE_API_KEY, or update demo_api_key.txt"
 			if !strings.Contains(err.Error(), "API key") && 
 			   !strings.Contains(err.Error(), "Demo_Key_Replace") && 
 			   !strings.Contains(err.Error(), "invalid header field value") {
@@ -855,7 +855,7 @@ func (m Model) getAIFunctionResponse(functionAPI api.FunctionAPI) tea.Cmd {
 		response, err := functionAPI.GetResponseWithFunctions(apiMessages, m.ai.SystemPrompt)
 		if err != nil {
 			// Clean up error message
-			errorContent := "❌ No API key configured. Please set your GEMINI_API_KEY or update demo_api_key.txt"
+			errorContent := "❌ No API key configured. Please set GEMINI_API_KEY or GOOGLE_API_KEY, or update demo_api_key.txt"
 			if !strings.Contains(err.Error(), "API key") && 
 			   !strings.Contains(err.Error(), "Demo_Key_Replace") && 
 			   !strings.Contains(err.Error(), "invalid header field value") {

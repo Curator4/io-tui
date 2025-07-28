@@ -43,8 +43,11 @@ func defineManifestFunction() *genai.FunctionDeclaration {
 func NewGeminiAPI() (*GeminiAPI, error) {
     ctx := context.Background()
     
-    // Get API key from environment, or read from demo file
+    // Get API key from environment (check both GEMINI_API_KEY and GOOGLE_API_KEY), or read from demo file
     apiKey := os.Getenv("GEMINI_API_KEY")
+    if apiKey == "" {
+        apiKey = os.Getenv("GOOGLE_API_KEY")
+    }
     if apiKey == "" {
         if keyBytes, err := os.ReadFile("demo_api_key.txt"); err == nil {
             content := strings.TrimSpace(string(keyBytes))
@@ -60,7 +63,7 @@ func NewGeminiAPI() (*GeminiAPI, error) {
     }
     
     if apiKey == "" {
-        return nil, fmt.Errorf("No API key found. Either export GEMINI_API_KEY=your_key or add your key to demo_api_key.txt")
+        return nil, fmt.Errorf("No API key found. Either export GEMINI_API_KEY=your_key or GOOGLE_API_KEY=your_key, or add your key to demo_api_key.txt")
     }
     
     // Check if it's the placeholder demo key
