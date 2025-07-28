@@ -27,7 +27,9 @@ export GEMINI_API_KEY="your_api_key"
 Extra: For the [boot.dev](https://boot.dev) **hackathon** I "pushed the api key to public repo" 🤡. Uncomment the key in *demo_api_key.txt*, and program should work 👍
 
 ### terminal UI
-I had more more plans to develop a more modular ui structure, ascii size dependant on terminal size, support for "wide" vs "tall" terminals. But I didn't come around to it. I made it to run and look good in my own personal terminal when using ~half monitor width and full monitor height. 1080p. Not even taking terminal text size into account. It will look bad on any other setting, so I suggest u do the same. Even then yours might (probably) look bad or off center or something. It is what it is, works on my machine 🤷‍♂️.
+I had more more plans to develop a more modular ui structure, ascii size dependant on terminal size, support for "wide" vs "tall" terminals. But I didn't come around to it. I made it to run and look good in my own personal terminal when using ~half monitor width and full monitor height. 1080p. Not even taking terminal text size into account. It will look bad on any other setting, so I suggest u do the same. Even then yours might (probably) look bad or off center or something.
+
+It is what it is, works on my machine 🤷‍♂️.
 
 ### commands
 - `/commands`, `/help`
