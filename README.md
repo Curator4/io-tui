@@ -169,7 +169,7 @@ Yes, the closer the deadline became, the more vibe coding I did. I feature creep
 ## ranting 👻
 Codebase is a mess because of the vibe coding 🍝.
 
-Because of this, I wouldn't use this as resume project to demonstrate code quality 🤣.
+Because of this, I wouldn't use this as resumee project to demonstrate code quality 🤣.
 
 Imo the core functionality is cool tho, it requests an imagefile, gets color palette, gets ascii, then stores them in database.
 
