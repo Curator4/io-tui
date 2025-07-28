@@ -1,6 +1,8 @@
 # Io - tui chatbot 🚀
 
-<img align="right" width="400" src="demo2.gif" style="margin: 0 0 20px 20px;">
+<div align="right" style="padding-left: 30px;">
+  <img width="400" src="demo2.gif">
+</div>
 
 This is a chat tui that makes requests to an API (currently gemini). It has some additional graphical features like art for the "ai" (ascii), an infopane and a statuspane.
 
