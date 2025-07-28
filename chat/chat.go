@@ -497,8 +497,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		
 		asciiHeight := lipgloss.Height(m.ascii)
-		m.viewport.Width = msg.Width
-		m.textarea.SetWidth(msg.Width)
+		// Account for border width in component sizing
+		borderWidth := 2
+		m.viewport.Width = msg.Width - borderWidth
+		m.textarea.SetWidth(msg.Width - borderWidth)
 		
 		// Calculate height with minimum safety check
 		newHeight := msg.Height - m.textarea.Height() - lipgloss.Height(gap) - asciiHeight
@@ -681,7 +683,9 @@ func (m Model) View() string {
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(m.palette[3]))
 
-	contentWidth := m.width
+	// Account for border width (2 chars: left + right border)
+	borderWidth := 2
+	contentWidth := m.width - borderWidth
 	
 	// Calculate heights for right panel components
 	statusPanelHeight := 3
