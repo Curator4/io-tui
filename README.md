@@ -6,6 +6,9 @@ Main feature is that you can create and switch between different "ais" (request 
 
 Has persistent database with sqlite.
 
+This project was made as part of the 2025 [boot.dev](https://boot.dev) hackathon!
+Thanks to all organizers and participants.
+
 <div align="center">
   <img src="demo2.gif" alt="Demo" width="400">
 </div>
