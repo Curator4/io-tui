@@ -51,7 +51,7 @@ It is what it is, works on my machine 🤷‍♂️
 - `/show prompt`
 - `/quit`, `:q`
 - `/manifest <name> <url>`
-- Tell ai to manifest character with an imagelink and it will call manifest itself, setting an appropiate prompt.
+- Tell ai to *manifest* character with an imagelink and it will call manifest itself, setting an appropiate prompt.
 - **IMPORTANT** when *manifesting*, pass the image as direct link, ie. it needs to end with .jpg or .png
 
 ### api 🌐
