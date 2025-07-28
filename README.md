@@ -33,6 +33,8 @@ Extra: For the [boot.dev](https://boot.dev) **hackathon** I "pushed the api key 
 I repeat *uncomment the key and program will work* (reads the demo_api_key.txt file if nothing is in env)
 
 ### terminal UI
+must run in a terminal that supports modern features and colors, utf-8 etc. I used kitty, but it worked on my windows terminal aswell.
+
 I had more more plans to develop a more modular ui structure, ascii size dependant on terminal size, support for "wide" vs "tall" terminals. But I didn't come around to it. I made it to run and look good in my own personal terminal when using ~half monitor width and full monitor height. 1080p. Not even taking terminal text size into account. It will look bad on any other setting, so I suggest u do the same. Even then yours might (probably) look bad or off center or something. 
 
 When I run on my Microsoft Windows client all the content doesn't fill window correctly, this is I assume because of some extra padding logic I had to add to get it to work on my specific hyprland setup. 
