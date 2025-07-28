@@ -29,11 +29,12 @@ Extra: For the [boot.dev](https://boot.dev) **hackathon** I "pushed the api key 
 - `/set [ai|api|model|prompt <text>]`
 - `/resume`
 - `/clear`
-- `/rename`
+- `/rename` renames current conversation
 - `/show prompt`
 - `/quit`, `:q`
 - `/manifest <name> <url>`
 - Tell ai to manifest character with an imagelink and it will call manifest itself, setting an appropiate prompt.
+- **IMPORTANT** when *manifesting*, pass the image as directl ink, ie. it needs to end with .jpg or .png
 
 ##  features / roadmap
 
