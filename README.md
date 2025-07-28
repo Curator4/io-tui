@@ -22,6 +22,7 @@ go mod tidy
 go run .
 ```
 **NOTE**: first run might take a bit because of database initialization
+
 **IMPORTANT**: to run you need an apikey (only gemini supported for now). Default behavior is to load apikey from your exports in .bashrc/.zshrc. If you have your own api key set:
 ```
 export GEMINI_API_KEY="your_api_key"
