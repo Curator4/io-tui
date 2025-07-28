@@ -266,12 +266,79 @@ func (g *GeminiAPI) GetStreamingResponse(messages []types.Message, systemPrompt 
 			if len(chunk.Candidates) > 0 && 
 			   chunk.Candidates[0] != nil && 
 			   chunk.Candidates[0].Content != nil &&
-			   len(chunk.Candidates[0].Content.Parts) > 0 &&
-			   chunk.Candidates[0].Content.Parts[0].Text != "" {
-				textChan <- chunk.Candidates[0].Content.Parts[0].Text
+			   len(chunk.Candidates[0].Content.Parts) > 0 {
+				
+				for _, part := range chunk.Candidates[0].Content.Parts {
+					if part.Text != "" {
+						textChan <- part.Text
+					}
+				}
 			}
 		}
 	}()
 
 	return textChan, errChan
+}
+
+func (g *GeminiAPI) GetEnhancedStreamingResponse(messages []types.Message, systemPrompt string) (<-chan string, <-chan []FunctionCall, <-chan error) {
+	textChan := make(chan string)
+	funcChan := make(chan []FunctionCall)
+	errChan := make(chan error, 1)
+
+	go func() {
+		defer close(textChan)
+		defer close(funcChan)
+		defer close(errChan)
+
+		chat, lastUserMessage, err := g.prepareChatSession(messages, systemPrompt)
+		if err != nil {
+			errChan <- err
+			return
+		}
+
+		ctx := context.Background()
+		stream := chat.SendMessageStream(ctx, genai.Part{Text: lastUserMessage})
+
+		var functionCalls []FunctionCall
+		
+		for chunk := range stream {
+			if chunk == nil {
+				continue
+			}
+			if len(chunk.Candidates) > 0 && 
+			   chunk.Candidates[0] != nil && 
+			   chunk.Candidates[0].Content != nil &&
+			   len(chunk.Candidates[0].Content.Parts) > 0 {
+				
+				for _, part := range chunk.Candidates[0].Content.Parts {
+					// Handle text parts
+					if part.Text != "" {
+						textChan <- part.Text
+					}
+					
+					// Handle function call parts
+					if part.FunctionCall != nil {
+						functionCall := FunctionCall{
+							Name: part.FunctionCall.Name,
+							Args: make(map[string]interface{}),
+						}
+						
+						// Convert function arguments
+						for key, value := range part.FunctionCall.Args {
+							functionCall.Args[key] = value
+						}
+						
+						functionCalls = append(functionCalls, functionCall)
+					}
+				}
+			}
+		}
+		
+		// Send function calls at the end if any were found
+		if len(functionCalls) > 0 {
+			funcChan <- functionCalls
+		}
+	}()
+
+	return textChan, funcChan, errChan
 }

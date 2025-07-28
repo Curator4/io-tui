@@ -75,12 +75,33 @@ type AIStreamStartMsg struct {
 }
 
 type AIStreamChunkMsg struct {
-	chunk    string
-	textChan <-chan string
-	errChan  <-chan error
+	chunk         string
+	functionCalls []api.FunctionCall
+	textChan      <-chan string
+	errChan       <-chan error
 }
 
 type AIStreamCompleteMsg struct {
+}
+
+type AIEnhancedStreamStartMsg struct {
+	textChan <-chan string
+	funcChan <-chan []api.FunctionCall
+	errChan  <-chan error
+}
+
+type AIEnhancedStreamChunkMsg struct {
+	chunk    string
+	textChan <-chan string
+	funcChan <-chan []api.FunctionCall
+	errChan  <-chan error
+}
+
+type AIEnhancedStreamFunctionMsg struct {
+	functionCalls []api.FunctionCall
+	textChan      <-chan string
+	funcChan      <-chan []api.FunctionCall
+	errChan       <-chan error
 }
 
 type ManifestSuccessMsg struct {
@@ -365,6 +386,71 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.statusPanel.status = AtEase
 		return m, nil
+
+	case AIEnhancedStreamStartMsg:
+		// Successful streaming start - set API status to online
+		m.apiStatus = online
+		// Add empty bot message immediately
+		m.messages = append(m.messages, types.Message{Role: "assistant", Content: ""})
+		m.statusPanel.status = Processing
+		if m.viewport.Height > 0 {
+			m.viewport.SetContent(m.formatMessages())
+			m.viewport.GotoBottom()
+		}
+		// Start reading first chunk or function call
+		return m, m.readNextEnhancedChunk(msg.textChan, msg.funcChan, msg.errChan)
+
+	case AIEnhancedStreamChunkMsg:
+		// Append chunk to last bot message
+		if len(m.messages) > 0 && m.messages[len(m.messages)-1].Role == "assistant" {
+			m.messages[len(m.messages)-1].Content += msg.chunk
+		}
+		// Update viewport and continue reading next chunk
+		if m.viewport.Height > 0 {
+			m.viewport.SetContent(m.formatMessages())
+			m.viewport.GotoBottom()
+		}
+		return m, m.readNextEnhancedChunk(msg.textChan, msg.funcChan, msg.errChan)
+
+	case AIEnhancedStreamFunctionMsg:
+		// Handle function calls - for manifest, stop streaming and just do the function
+		for _, funcCall := range msg.functionCalls {
+			if funcCall.Name == "manifest_character" {
+				// Extract arguments
+				name, nameOk := funcCall.Args["name"].(string)
+				imageURL, imageOk := funcCall.Args["image_url"].(string)
+				description, descOk := funcCall.Args["description"].(string)
+				
+				if !nameOk || !imageOk || !descOk {
+					errorMsg := types.Message{
+						Role:    "system",
+						Content: "🔥 Manifest failed: Missing required parameters",
+					}
+					m.messages = append(m.messages, errorMsg)
+					m.statusPanel.status = AtEase
+					if m.viewport.Height > 0 {
+						m.viewport.SetContent(m.formatMessages())
+						m.viewport.GotoBottom()
+					}
+					return m, nil
+				}
+				
+				// Set manifesting status
+				m.statusPanel.status = Manifesting
+				m.statusPanel.manifestingName = name
+				
+				// Update display to show manifesting status
+				if m.viewport.Height > 0 {
+					m.viewport.SetContent(m.formatMessages())
+					m.viewport.GotoBottom()
+				}
+				
+				// For manifest, stop streaming and just execute the function
+				return m, m.processManifestWithDescription(name, imageURL, description)
+			}
+		}
+		// Continue reading the stream for other function calls
+		return m, m.readNextEnhancedChunk(msg.textChan, msg.funcChan, msg.errChan)
 
 	case ManifestSuccessMsg:
 		// Automatically switch to the newly created AI
@@ -841,6 +927,75 @@ func (m Model) readNextChunk(textChan <-chan string, errChan <-chan error) tea.C
 	}
 }
 
+func (m Model) getEnhancedStreamingResponse(enhancedAPI api.EnhancedStreamingAPI) tea.Cmd {
+	return func() tea.Msg {
+		// Filter out system messages for API calls
+		var apiMessages []types.Message
+		for _, msg := range m.messages {
+			if msg.Role != "system" {
+				apiMessages = append(apiMessages, msg)
+			}
+		}
+		
+		// Start enhanced streaming
+		textChan, funcChan, errChan := enhancedAPI.GetEnhancedStreamingResponse(apiMessages, m.ai.SystemPrompt)
+		
+		return AIEnhancedStreamStartMsg{
+			textChan: textChan,
+			funcChan: funcChan,
+			errChan:  errChan,
+		}
+	}
+}
+
+func (m Model) readNextEnhancedChunk(textChan <-chan string, funcChan <-chan []api.FunctionCall, errChan <-chan error) tea.Cmd {
+	return func() tea.Msg {
+		select {
+		case chunk, ok := <-textChan:
+			if !ok {
+				// Text channel closed, check if function channel has data
+				select {
+				case funcs, funcOk := <-funcChan:
+					if funcOk && len(funcs) > 0 {
+						return AIEnhancedStreamFunctionMsg{
+							functionCalls: funcs,
+							textChan:      textChan,
+							funcChan:      funcChan,
+							errChan:       errChan,
+						}
+					}
+				default:
+				}
+				return AIStreamCompleteMsg{}
+			}
+			return AIEnhancedStreamChunkMsg{
+				chunk:    chunk,
+				textChan: textChan,
+				funcChan: funcChan,
+				errChan:  errChan,
+			}
+		case funcs, ok := <-funcChan:
+			if ok && len(funcs) > 0 {
+				return AIEnhancedStreamFunctionMsg{
+					functionCalls: funcs,
+					textChan:      textChan,
+					funcChan:      funcChan,
+					errChan:       errChan,
+				}
+			}
+			// Continue reading text
+			return m.readNextEnhancedChunk(textChan, funcChan, errChan)
+		case err := <-errChan:
+			if err != nil {
+				return AIResponseMsg{
+					message: types.Message{Role: "assistant", Content: fmt.Sprintf("Error: %v", err)},
+				}
+			}
+			return AIStreamCompleteMsg{}
+		}
+	}
+}
+
 func (m Model) getAIFunctionResponse(functionAPI api.FunctionAPI) tea.Cmd {
 	return func() tea.Msg {
 		// Filter out system messages for API calls
@@ -889,8 +1044,10 @@ func (m Model) getAIFunctionResponse(functionAPI api.FunctionAPI) tea.Cmd {
 }
 
 func (m Model) callAI(userInput string) tea.Cmd {
-	// Check for function calling capability first
-	if functionAPI, ok := m.aicore.API.(api.FunctionAPI); ok {
+	// Check for enhanced streaming (with function calls) first
+	if enhancedAPI, ok := m.aicore.API.(api.EnhancedStreamingAPI); ok {
+		return m.getEnhancedStreamingResponse(enhancedAPI)
+	} else if functionAPI, ok := m.aicore.API.(api.FunctionAPI); ok {
 		return m.getAIFunctionResponse(functionAPI)
 	} else if streamingAPI, ok := m.aicore.API.(api.StreamingAPI); ok {
 		return m.getAIStreamingResponse(streamingAPI)

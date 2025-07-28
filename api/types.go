@@ -23,6 +23,11 @@ type StreamingAPI interface {
 	GetStreamingResponse(messages []types.Message, systemPrompt string) (<-chan string, <-chan error)
 }
 
+type EnhancedStreamingAPI interface {
+	StreamingAPI
+	GetEnhancedStreamingResponse(messages []types.Message, systemPrompt string) (<-chan string, <-chan []FunctionCall, <-chan error)
+}
+
 type FunctionAPI interface {
 	AIAPI
 	GetResponseWithFunctions(messages []types.Message, systemPrompt string) (*ResponseWithFunctions, error)
