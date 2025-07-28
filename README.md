@@ -15,7 +15,7 @@ Thanks to all organizers and participants.
 
 <br clear="right"/>
 
-## usage guide 📋
+## usage guide
 to run, `clone` and do:
 ```
 go mod tidy
@@ -27,7 +27,7 @@ go run .
 ```
 export GEMINI_API_KEY="your_api_key"
 ```
-### hackathon 🛠️
+### hackathon
 Extra: For the [boot.dev](https://boot.dev) **hackathon** I "pushed the api key to public repo" 🤡. Uncomment the key in *demo_api_key.txt*, and program should work 👍.
 
 I repeat *uncomment the key and program will work* (reads the demo_api_key.txt file if nothing is in env)
@@ -41,7 +41,7 @@ When I run on my Microsoft Windows client all the content doesn't fill window co
 
 It is what it is, works on my machine 🤷‍♂️
 
-### commands 📝
+### commands
 - `/commands`, `/help`
 - `/list [ais|apis|models <api]`
 - `/set [ai|api|model|prompt <text>]`
@@ -54,7 +54,7 @@ It is what it is, works on my machine 🤷‍♂️
 - Tell ai to *manifest* character with an imagelink and it will call manifest itself, setting an appropiate prompt.
 - **IMPORTANT** when *manifesting*, pass the image as direct link, ie. it needs to end with .jpg or .png
 
-### api 🌐
+### api
 For now only google gemini is supported, and for that 2 models only.
 
 I had plans to make shifting between api-provider/models easy, fast, intuitive. But what can you do.
