@@ -60,6 +60,13 @@ I had plans to make shifting between api-provider/models easy, fast, intuitive. 
 ## disclaimer
 Yes, the closer the deadline became, the more vibe coding I did. I feature creeped too much to make it otherwise 😔
 
+### external libraries
+- [bubbletea](github.com/charmbracelet/bubbletea)
+- [google genai](google.golang.org/genai)
+- [sqlite](modernc.org/sqlite)
+- [image2ascii](github.com/qeesung/image2ascii)
+- [colorthief](github.com/cascax/colorthief-go)
+
 **Anything after this is irrelevant.**
 ##  features / roadmap
 
