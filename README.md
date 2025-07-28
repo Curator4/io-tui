@@ -36,6 +36,11 @@ Extra: For the [boot.dev](https://boot.dev) **hackathon** I "pushed the api key 
 - Tell ai to manifest character with an imagelink and it will call manifest itself, setting an appropiate prompt.
 - **IMPORTANT** when *manifesting*, pass the image as direct link, ie. it needs to end with .jpg or .png
 
+### api
+For now only google gemini is supported, and for that 2 models only.
+
+I had plans to make shifting between api-provider/models easy, fast, intuitive. But what can you do.
+
 ## disclaimer
 Yes, the closer the deadline became, the more vibe coding I did. I feature creeped too much to make it otherwise. 😔
 
