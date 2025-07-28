@@ -5,6 +5,8 @@ Main feature is that you can create and switch between different "ais" (request 
 
 Has persistent database with sqlite.
 
+![Demo](demo.gif)
+
 ## usage guide
 to run use:
 `go run main.go`
