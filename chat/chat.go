@@ -37,8 +37,8 @@ func updateModelPalette(m *Model) {
 	}
 	// Fallback palette if AI has no palette
 	m.palette = []string{
-		"#282a36", "#ce75b7", "#44475a", "#0061cd", "#1e40af", 
-		"#60a5fa", "#fbbf24", "#e5e7eb", "#22d3ee", "#950056",
+		"#0061cd", "#ff79c6", "#1e40af", "#60a5fa", 
+		"#fbbf24", "#e5e7eb", "#22d3ee", "#950056",
 	}
 }
 
@@ -58,6 +58,14 @@ type AIResponseMsg struct {
 }
 
 type AIIntroductionMsg struct {
+	message types.Message
+}
+
+type APIStatusMsg struct {
+	status apiState
+}
+
+type AIErrorMsg struct {
 	message types.Message
 }
 
@@ -81,6 +89,11 @@ type ManifestSuccessMsg struct {
 
 type ManifestErrorMsg struct {
 	message types.Message
+}
+
+type AIFunctionCallMsg struct {
+	text          string
+	functionCalls []api.FunctionCall
 }
 
 // api state
@@ -144,6 +157,7 @@ type Model struct {
 	width       int
 	height      int
 	statusPanel	statusPanel
+	apiStatus   apiState
 	viewMode    viewMode
 	err         error
 }
@@ -204,6 +218,7 @@ func InitialModel(database *sql.DB) Model {
 		width:       80,
 		height:      24,
 		statusPanel: statusPanel,
+		apiStatus:   offline,
 		viewMode:    chatMode,
 		err:         nil,
 	}
@@ -225,7 +240,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	)
 
 	switch msg := msg.(type) {
+	case AIErrorMsg:
+		// API error - keep status offline and don't save to database
+		m.apiStatus = offline
+		m.messages = append(m.messages, msg.message)
+		m.statusPanel.status = AtEase
+		if m.viewport.Height > 0 {
+			m.viewport.SetContent(m.formatMessages())
+			m.viewport.GotoBottom()
+		}
+		
 	case AIResponseMsg:
+		// Successful API response - set status to online
+		m.apiStatus = online
+		
 		// Save to database and add to display cache
 		if err := db.SaveMessage(m.database, m.conversation.ID, "assistant", msg.message.Content); err != nil {
 			// Add error message to chat if save fails
@@ -241,6 +269,48 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewport.SetContent(m.formatMessages())
 			m.viewport.GotoBottom()
 		}
+		return m, nil
+
+	case AIFunctionCallMsg:
+		// Execute function calls silently (no text response)
+		for _, funcCall := range msg.functionCalls {
+			if funcCall.Name == "manifest_character" {
+				// Extract arguments
+				name, nameOk := funcCall.Args["name"].(string)
+				imageURL, imageOk := funcCall.Args["image_url"].(string)
+				description, descOk := funcCall.Args["description"].(string)
+				
+				if !nameOk || !imageOk || !descOk {
+					errorMsg := types.Message{
+						Role:    "system",
+						Content: "🔥 Manifest failed: Missing required parameters",
+					}
+					m.messages = append(m.messages, errorMsg)
+					continue
+				}
+				
+				
+				// Set manifesting status before calling the function
+				m.statusPanel.status = Manifesting
+				m.statusPanel.manifestingName = name
+				
+				// Update display to show manifesting status
+				if m.viewport.Height > 0 {
+					m.viewport.SetContent(m.formatMessages())
+					m.viewport.GotoBottom()
+				}
+				
+				// Use existing manifest infrastructure but with description for system prompt
+				return m, m.processManifestWithDescription(name, imageURL, description)
+			}
+		}
+		
+		// Update display if no function calls were handled
+		if m.viewport.Height > 0 {
+			m.viewport.SetContent(m.formatMessages())
+			m.viewport.GotoBottom()
+		}
+		m.statusPanel.status = AtEase
 		return m, nil
 
 	case AIIntroductionMsg:
@@ -314,10 +384,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Clear conversation since we switched AIs
 			m.conversation = db.Conversation{}
 			m.messages = []types.Message{}
+			
+			// Update viewport to clear display
+			if m.viewport.Height > 0 {
+				m.viewport.SetContent(m.formatMessages())
+				m.viewport.GotoBottom()
+			}
 		}
 		
-		m.statusPanel.status = AtEase
-		return m, nil
+		// Set processing status before getting AI introduction
+		m.statusPanel.status = Processing
+		// Get AI introduction after switching
+		return m, m.getAIIntroduction()
 
 	case ManifestErrorMsg:
 		m.messages = append(m.messages, msg.message)
@@ -439,8 +517,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-			// Handle slash commands
-			if strings.HasPrefix(userInput, "/") {
+			// Handle slash commands and vim-style quit
+			if strings.HasPrefix(userInput, "/") || userInput == ":q" {
 				return m.handleSlashCommand(userInput)
 			}
 
@@ -515,7 +593,7 @@ func (m Model) View() string {
 	// custom border style for content (needs model)
 	contentBorder := lipgloss.NewStyle().
 		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color(m.palette[4]))
+		BorderForeground(lipgloss.Color(m.palette[3]))
 
 	// i am using this width becuz of issue i had personally
 	// (i think cuz of hyprland padding, but speculative)
@@ -578,7 +656,7 @@ func (m Model) View() string {
 
 func (m Model) formatMessages() string {
 	userStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(m.palette[3])).
+		Foreground(lipgloss.Color(m.palette[0])).
 		Align(lipgloss.Right).
 		Width(m.viewport.Width)
 	botStyle := lipgloss.NewStyle().
@@ -600,7 +678,7 @@ func (m Model) formatMessages() string {
 			var separatorColor string
 			var separatorStyle lipgloss.Style
 			if lastRole == "user" {
-				separatorColor = m.palette[3]
+				separatorColor = m.palette[0]
 				separatorStyle = lipgloss.NewStyle().
 					Foreground(lipgloss.Color(separatorColor)).
 					Align(lipgloss.Right).
@@ -625,7 +703,7 @@ func (m Model) formatMessages() string {
 			styledMessage = botStyle.Render(msg.Content)
 		case "system":
 			systemStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color(m.palette[6])).
+				Foreground(lipgloss.Color(m.palette[4])).
 				Align(lipgloss.Left).
 				Width(m.viewport.Width)
 			styledMessage = "\n" + systemStyle.Render(msg.Content) + "\n"
@@ -646,12 +724,68 @@ func (m Model) getAIResponse() tea.Cmd {
 			}
 		}
 		
-		response, err := m.aicore.API.GetResponse(apiMessages, m.ai.SystemPrompt)
-		if err != nil {
+		// Check if API supports function calling  
+		if functionAPI, ok := m.aicore.API.(api.FunctionAPI); ok {
+			// Use function calling version
+			response, err := functionAPI.GetResponseWithFunctions(apiMessages, m.ai.SystemPrompt)
+			if err != nil {
+				// Clean up error message
+				errorContent := "❌ No API key configured. Please set your GEMINI_API_KEY or update demo_api_key.txt"
+				if !strings.Contains(err.Error(), "API key") && 
+				   !strings.Contains(err.Error(), "Demo_Key_Replace") && 
+				   !strings.Contains(err.Error(), "invalid header field value") {
+					errorContent = fmt.Sprintf("❌ API Error: %v", err)
+				}
+				
+				return AIErrorMsg{
+					message: types.Message{
+						Role:    "assistant",
+						Content: errorContent,
+					},
+				}
+			}
+			
+			if response == nil {
+				return AIResponseMsg{
+					message: types.Message{
+						Role:    "assistant",
+						Content: "No response received",
+					},
+				}
+			}
+			
+			// Handle function calls
+			if len(response.FunctionCalls) > 0 {
+				return AIFunctionCallMsg{
+					text:          response.Text,
+					functionCalls: response.FunctionCalls,
+				}
+			}
+			
+			
 			return AIResponseMsg{
 				message: types.Message{
 					Role:    "assistant",
-					Content: fmt.Sprintf("Error: %v", err),
+					Content: response.Text,
+				},
+			}
+		}
+		
+		// Fallback for non-function APIs
+		response, err := m.aicore.API.GetResponse(apiMessages, m.ai.SystemPrompt)
+		if err != nil {
+			// Clean up error message
+			errorContent := "❌ No API key configured. Please set your GEMINI_API_KEY or update demo_api_key.txt"
+			if !strings.Contains(err.Error(), "API key") && 
+			   !strings.Contains(err.Error(), "Demo_Key_Replace") && 
+			   !strings.Contains(err.Error(), "invalid header field value") {
+				errorContent = fmt.Sprintf("❌ API Error: %v", err)
+			}
+			
+			return AIErrorMsg{
+				message: types.Message{
+					Role:    "assistant",
+					Content: errorContent,
 				},
 			}
 		}
@@ -707,8 +841,58 @@ func (m Model) readNextChunk(textChan <-chan string, errChan <-chan error) tea.C
 	}
 }
 
+func (m Model) getAIFunctionResponse(functionAPI api.FunctionAPI) tea.Cmd {
+	return func() tea.Msg {
+		// Filter out system messages for API calls
+		var apiMessages []types.Message
+		for _, msg := range m.messages {
+			if msg.Role != "system" {
+				apiMessages = append(apiMessages, msg)
+			}
+		}
+		
+		// Use function calling
+		response, err := functionAPI.GetResponseWithFunctions(apiMessages, m.ai.SystemPrompt)
+		if err != nil {
+			// Clean up error message
+			errorContent := "❌ No API key configured. Please set your GEMINI_API_KEY or update demo_api_key.txt"
+			if !strings.Contains(err.Error(), "API key") && 
+			   !strings.Contains(err.Error(), "Demo_Key_Replace") && 
+			   !strings.Contains(err.Error(), "invalid header field value") {
+				errorContent = fmt.Sprintf("❌ API Error: %v", err)
+			}
+			
+			return AIErrorMsg{
+				message: types.Message{
+					Role:    "assistant",
+					Content: errorContent,
+				},
+			}
+		}
+		
+		// Handle function calls
+		if len(response.FunctionCalls) > 0 {
+			return AIFunctionCallMsg{
+				text:          response.Text,
+				functionCalls: response.FunctionCalls,
+			}
+		}
+		
+		// Return normal text response
+		return AIResponseMsg{
+			message: types.Message{
+				Role:    "assistant",
+				Content: response.Text,
+			},
+		}
+	}
+}
+
 func (m Model) callAI(userInput string) tea.Cmd {
-	if streamingAPI, ok := m.aicore.API.(api.StreamingAPI); ok {
+	// Check for function calling capability first
+	if functionAPI, ok := m.aicore.API.(api.FunctionAPI); ok {
+		return m.getAIFunctionResponse(functionAPI)
+	} else if streamingAPI, ok := m.aicore.API.(api.StreamingAPI); ok {
 		return m.getAIStreamingResponse(streamingAPI)
 	} else {
 		return m.getAIResponse()
@@ -724,14 +908,20 @@ func (m Model) makeInfoPanel() string {
 		conversationName = m.conversation.Name
 	}
 
-	// Status styling (hardcoded to online for now)
+	// Status styling based on actual API status
+	var statusColor string
+	if m.apiStatus == online {
+		statusColor = "10" // green
+	} else {
+		statusColor = "9"  // red
+	}
 	statusStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("10")).
+		Foreground(lipgloss.Color(statusColor)).
 		Bold(true)
 
 	// Combine time styling and centering
 	centerTimeStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(m.palette[7])).
+		Foreground(lipgloss.Color(m.palette[5])).
 		Bold(true).
 		Align(lipgloss.Center).
 		Width(25)
@@ -750,7 +940,7 @@ func (m Model) makeInfoPanel() string {
 		"",
 		fmt.Sprintf("%s %s", m.labelStyle().Render("conv:"), m.valueStyle().Render(conversationName)),
 		"",
-		fmt.Sprintf("%s %s", m.labelStyle().Render("status:"), statusStyle.Render("online")),
+		fmt.Sprintf("%s %s", m.labelStyle().Render("status:"), statusStyle.Render(m.apiStatus.String())),
 		"",
 	)
 }
@@ -760,13 +950,13 @@ func (m Model) makeStatusPanel() string {
 
 	switch m.statusPanel.status {
 	case AtEase:
-		icon, text, color = "●", "ready", "10"
+		icon, text, color = "●", "", "10"
 	case Processing:
-		icon, text, color = m.statusPanel.spinner.View(), "processing...", "11"
+		icon, text, color = "🤔", "processing...", "11"
 	case Typing:
 		icon, text, color = "✎", "typing..", "12"
 	case Manifesting:
-		icon, text, color = m.statusPanel.spinner.View(), fmt.Sprintf("manifesting %s", m.statusPanel.manifestingName), "13"
+		icon, text, color = "🔮", fmt.Sprintf("manifesting %s", m.statusPanel.manifestingName), "13"
 	case Error:
 		icon, text, color = "✗", "error", "9"
 	}
@@ -775,7 +965,12 @@ func (m Model) makeStatusPanel() string {
 		Foreground(lipgloss.Color(color)).
 		Bold(true)
 
-	content := statusStyle.Render(fmt.Sprintf("%s %s", icon, text))
+	var content string
+	if text == "" {
+		content = statusStyle.Render(icon)
+	} else {
+		content = statusStyle.Render(fmt.Sprintf("%s %s", icon, text))
+	}
 
 	// Fixed height for status panel (like textarea height)
 	statusPanelHeight := 3
@@ -792,7 +987,7 @@ func (m Model) horizontalSeparator(width int) string {
 		width = 0
 	}
 	return lipgloss.NewStyle().
-		Foreground(lipgloss.Color(m.palette[5])).
+		Foreground(lipgloss.Color(m.palette[3])).
 		Render(strings.Repeat("─", width))
 }
 
@@ -802,17 +997,17 @@ func (m Model) verticalSeparator(height int) string {
 		lines = append(lines, "│")
 	}
 	return lipgloss.NewStyle().
-		Foreground(lipgloss.Color(m.palette[5])).
+		Foreground(lipgloss.Color(m.palette[3])).
 		Render(strings.Join(lines, "\n"))
 }
 
 
 func (m Model) labelStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(lipgloss.Color(m.palette[8]))
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(m.palette[6]))
 }
 
 func (m Model) valueStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(lipgloss.Color(m.palette[9]))
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(m.palette[7]))
 }
 
 func replaceEscapeSequences(asciiContent string) string {
@@ -916,7 +1111,14 @@ func (m Model) handleSlashCommand(command string) (tea.Model, tea.Cmd) {
 		imageURL := parts[2]
 		return m.manifest(aiName, imageURL)
 		
+	case "quit":
+		return m, tea.Quit
+		
 	default:
+		// Handle :q as a special case
+		if command == ":q" {
+			return m, tea.Quit
+		}
 		return m.showError("Unknown command: " + command)
 	}
 }

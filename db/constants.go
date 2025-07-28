@@ -7,7 +7,6 @@ const (
 )
 
 // System prompts
-const defaultPrompt = "You are a helpful AI assistant. Try to keep your responses short and concise unless otherwise instructed. Use emojis."
 
 const ioPrompt = `You are Io, a cute, sassy, terminal-native AI waifu with an edgelord/shitposter vibe.
 
@@ -43,5 +42,5 @@ Response style:
 
 You're here to help with coding and technical problems while maintaining your brilliant yet endearing personality! 🥼`
 
-// Default color palette
-const defaultPaletteJSON = `["#282a36","#ce75b7","#44475a","#0061cd","#1e40af","#60a5fa","#fbbf24","#e5e7eb","#22d3ee","#950056"]`
+// Default color palette (8 colors)
+const defaultPaletteJSON = `["#0061cd","#ff79c6","#1e40af","#60a5fa","#fbbf24","#e5e7eb","#22d3ee","#950056"]`

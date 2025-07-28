@@ -16,22 +16,23 @@ I considered a few "platforms" for this project, discord bot, server hosted xter
         - [x] calls with conversation context
 
 - [ ] submission ready
-    - [ ] "runnable in 5 minutes" apikey considerations
+    - [x] "runnable in 5 minutes" apikey considerations
     - [ ] test on other machines
     - [ ] "Your GitHub repo must have a README.md with an explanation of the project, what it does, how to run it, etc"
     - [ ] add disclaimer about partial use of AI to readme
     - [ ] social post
 
 pref before turnin
-- [ ] background colors
 - [ ] dynamic size for ascii on manifestation
-- [ ] create ai with colors
-    - [ ] set it up as tool
-    - [ ] tool should call the set ai command too, and print short introduction
-    - [ ] tool call ai to make prompt
+- [x] create ai with colors
+    - [x] set it up as tool
+    - [x] tool should call the set ai command too, and print short introduction
+    - [x] tool call ai to make prompt
+- [ ] default ais, io and makise
 - [ ] emoji github.com/kyokomi/emoji
 - [ ] openai
 - [ ] changing terminal layout depending on aspect ratio
+- [ ] copy paste
 
 - [ ] features
     - [x] database
@@ -41,7 +42,7 @@ pref before turnin
         - [x] integration into chat logic
     - [ ] UI
         - [ ] dynamic layout for wide terminal (currently basically assumes u in a tall terminal)
-        - [ ] different color palettes (perhaps dynamically generated based on input image/ascii
+        - [x] different color palettes (perhaps dynamically generated based on input image/ascii
         - [ ] newlines in textarea
         - [ ] chat
             - [ ] support emoji, both input & output, i'm thinking :thinking: for input

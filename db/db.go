@@ -53,7 +53,7 @@ func initialSetup(db *sql.DB) error {
 	}
 	
 	// Create seed data
-	if err := CreateAI(db, "Default", defaultPrompt, defaultAPI, defaultModel, defaultASCII, defaultPaletteJSON, true); err != nil {
+	if err := CreateAI(db, "Io", ioPrompt, defaultAPI, defaultModel, defaultASCII, defaultPaletteJSON, true); err != nil {
 		return fmt.Errorf("failed to create default ai: %w", err)
 	}
 	

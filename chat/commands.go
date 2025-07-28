@@ -483,12 +483,19 @@ func (m Model) showCommands() (tea.Model, tea.Cmd) {
   /show prompt             - Display current AI system prompt
   /commands, /help         - Show this help message
 
+🚪 Exit:
+  /quit, :q                - Exit the application
+
 🔮 Black Magic Rituals:
   /manifest <name> <url>   - Summon character using dark arts
+  
+  Or ask the AI directly:
+  "Please manifest Pikachu with https://i.imgur.com/pikachu.png"
 
 💡 Tips:
   - Use /clear to clear this help message and start fresh
-  - For /manifest: use direct image URLs (imgur .png/.jpg)`
+  - For /manifest: use direct image URLs (imgur .png/.jpg)
+  - The AI can also manifest characters when you ask it naturally`
 
 	commandsMsg := types.Message{
 		Role:    "system",
@@ -544,6 +551,14 @@ func (m Model) manifest(name, imageURL string) (tea.Model, tea.Cmd) {
 	return m, m.processManifest(name, imageURL)
 }
 
+func (m Model) manifestWithDescription(name, imageURL, description string) (tea.Model, tea.Cmd) {
+	// Set status to manifesting
+	m.statusPanel.status = Manifesting
+	m.statusPanel.manifestingName = name
+	
+	return m, m.processManifestWithDescription(name, imageURL, description)
+}
+
 func (m Model) processManifest(name, imageURL string) tea.Cmd {
 	return func() tea.Msg {
 		// Call visual package to generate palette and ASCII
@@ -587,6 +602,83 @@ func (m Model) processManifest(name, imageURL string) tea.Cmd {
 			aiName: name,
 		}
 	}
+}
+
+func (m Model) processManifestWithDescription(name, imageURL, description string) tea.Cmd {
+	return func() tea.Msg {
+		// Call visual package to generate palette and ASCII
+		palette, ascii, err := visual.GenerateFromImageURL(imageURL)
+		if err != nil {
+			return ManifestErrorMsg{
+				message: types.Message{
+					Role:    "system",
+					Content: fmt.Sprintf("🔥 Manifest ritual failed: %v", err),
+				},
+			}
+		}
+		
+		// Convert palette to JSON for database
+		paletteJSON, err := visual.FormatPaletteForDB(palette)
+		if err != nil {
+			return ManifestErrorMsg{
+				message: types.Message{
+					Role:    "system",
+					Content: "🔥 Failed to format color palette",
+				},
+			}
+		}
+		
+		// Generate character-specific system prompt using AI
+		systemPrompt, err := m.generateSystemPrompt(name, description)
+		if err != nil {
+			// Fallback to basic prompt if generation fails
+			systemPrompt = fmt.Sprintf("You are %s. %s\n\nBe concise and direct in your responses. Avoid lengthy explanations unless specifically asked.", name, description)
+		}
+		
+		// Create AI in database with generated prompt
+		err = db.CreateAI(m.database, name, systemPrompt, "gemini", "gemini-2.0-flash-exp", ascii, paletteJSON, false)
+		if err != nil {
+			return ManifestErrorMsg{
+				message: types.Message{
+					Role:    "system",
+					Content: fmt.Sprintf("🔥 Failed to save character to database: %v", err),
+				},
+			}
+		}
+		
+		// Return success with AI name for automatic switching
+		return ManifestSuccessMsg{
+			aiName: name,
+		}
+	}
+}
+
+func (m Model) generateSystemPrompt(name, description string) (string, error) {
+	// Create a prompt to generate the character's system prompt
+	promptGenerationMessages := []types.Message{
+		{
+			Role: "user",
+			Content: fmt.Sprintf(`Generate a concise system prompt for a character AI named "%s" with this description: %s
+
+The system prompt should:
+- Define their personality and speaking style clearly
+- Include key traits and behaviors  
+- Instruct them to be concise and direct (no rambling)
+- Include instructions for the character to use emojis in their responses that match their personality (e.g., tell Pikachu to use ⚡ emojis, detectives to use 🔍, Batman to use 🦇, etc.)
+- Be under 200 words
+- Start with "You are %s"
+
+Return only the system prompt, nothing else.`, name, description, name),
+		},
+	}
+	
+	// Generate system prompt using current AI
+	generatedPrompt, err := m.aicore.API.GetResponse(promptGenerationMessages, "You are a helpful assistant that creates character system prompts. Be concise and precise.")
+	if err != nil {
+		return "", err
+	}
+	
+	return generatedPrompt, nil
 }
 
 // Helper functions

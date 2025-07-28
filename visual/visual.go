@@ -40,8 +40,8 @@ func GenerateFromImageURL(imageURL string) (palette []string, ascii string, err 
 
 // extractPalette uses colorthief to extract dominant colors from an image
 func extractPalette(imagePath string) ([]string, error) {
-	// Extract 10 dominant colors
-	colors, err := colorthief.GetPaletteFromFile(imagePath, 10)
+	// Extract 8 dominant colors
+	colors, err := colorthief.GetPaletteFromFile(imagePath, 8)
 	if err != nil {
 		return nil, fmt.Errorf("failed to extract palette: %w", err)
 	}
@@ -86,13 +86,22 @@ func generateASCII(imagePath string) (string, error) {
 
 // downloadImage downloads an image from URL to a temporary file
 func downloadImage(url string) (string, error) {
-	// Create HTTP client with timeout
+	// Create HTTP client with timeout and proper headers
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 	}
 	
+	// Create request with proper headers
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	
+	// Add user agent to avoid blocking
+	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; io-tui/1.0)")
+	
 	// Make request
-	resp, err := client.Get(url)
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("failed to download image: %w", err)
 	}
