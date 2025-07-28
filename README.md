@@ -16,7 +16,7 @@ Thanks to all organizers and participants.
 <br clear="right"/>
 
 ## usage guide
-to run use:
+to run, `clone` and do:
 `go run .`
 
 **IMPORTANT**: to run you need an apikey (only gemini supported for now). Default behavior is to load apikey from your exports in .bashrc/.zshrc. If you have your own api key set:
