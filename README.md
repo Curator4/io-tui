@@ -30,10 +30,6 @@ go run .
 ```
 export GEMINI_API_KEY="your_api_key"
 ```
-### hackathon
-Extra: For the [boot.dev](https://boot.dev) **hackathon** I "pushed the api key to public repo" 🤡. Uncomment the key in *demo_api_key.txt*, and program should work 👍.
-
-I repeat *uncomment the key and program will work* (reads the demo_api_key.txt file if nothing is in env)
 
 ### terminal UI </>
 must run in a terminal that supports modern features and colors, utf-8 etc. I used [kitty](https://github.com/kovidgoyal/kitty), but it worked on my windows terminal aswell (with some alignment issues).
